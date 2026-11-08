@@ -136,6 +136,47 @@ button:hover{filter:brightness(1.08)}
 .note{font-size:12px;color:var(--muted);margin:10px 0 0}
 @media (prefers-reduced-motion:no-preference){.item{animation:rise .25s ease-out}}
 @keyframes rise{from{opacity:.2;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+/* attendee-experience board */
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--soft)}
+.stat b{display:block;font-size:24px;line-height:1.3;font-variant-numeric:tabular-nums}
+.stat span{font-size:13px;color:var(--muted)}
+.stat.warn b{color:var(--urgent)}
+.al-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.al{border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--surface);display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.al.unread{background:var(--soft)}
+.al.k-sponsor{border-inline-start:4px solid var(--mid)}
+.al.k-complaint{border-inline-start:4px solid var(--urgent)}
+.al.k-assign{border-inline-start:4px solid var(--low)}
+.al.k-change{border-inline-start:4px solid var(--brand)}
+.al-body{min-width:0}
+.al-kind{font-size:12px;color:var(--muted);margin:0}
+.al-text{margin:0;font-size:14px;overflow-wrap:anywhere}
+.al.unread .al-text{font-weight:600}
+.al button{padding:2px 10px;font-size:13px;white-space:nowrap}
+.sess-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.sc{display:block;text-align:start;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-weight:400}
+.sc.sel{outline:2px solid var(--brand);outline-offset:1px}
+.sc b{display:block;font-weight:600;line-height:1.5;overflow-wrap:anywhere}
+.sc small{display:block;color:var(--muted);font-size:12px}
+.flag{display:block;color:var(--urgent);font-size:12px;font-weight:600}
+.meter{height:10px;border-radius:999px;background:var(--soft);border:1px solid var(--line);overflow:hidden;margin:6px 0}
+.meter i{display:block;height:100%;background:var(--low)}
+.meter.over i{background:var(--urgent)}
+.warn-text{color:var(--urgent);font-weight:600;font-size:14px;margin:4px 0}
+.ok-text{color:var(--low);font-weight:600;font-size:14px;margin:4px 0}
+.chk{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:14px;color:var(--ink)}
+.chk input{width:auto}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.pchip{padding:1px 10px;border-radius:999px;background:var(--brand-bg);border:1px solid var(--brand);font-size:13px}
+.pchip.vol{background:var(--mid-bg);border-color:var(--mid)}
+.steps.s6{grid-template-columns:repeat(6,minmax(0,1fr))}
+.steps.s6 li{font-size:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
+.row .field{flex:1 1 140px}
+.sub-h{font-size:13px;font-weight:600;margin:14px 0 4px}
 </style>
 
 <div class="wrap" dir="rtl" lang="ar">
@@ -165,7 +206,7 @@ button:hover{filter:brightness(1.08)}
     {id:'pr',name:'العلاقات العامة',members:['فهد','لمى'],note:'حجز مكان الجلسة والتواصل مع الجهة.'},
     {id:'written',name:'المحتوى المكتوب',members:['نورة','ماجد'],note:''},
     {id:'visual',name:'المحتوى المرئي',members:['سعد','هند'],note:''},
-    {id:'attendee',name:'تجربة الحضور',members:['ريم','تركي'],note:''},
+    {id:'attendee',name:'تجربة الحضور',members:['ريم','تركي'],note:'المسؤول التشغيلي: فاطمة السريج · المسؤول المطور: اثير العيسي.'},
     {id:'digital',name:'الهوية الرقمية',members:['بدر','جود'],note:''},
     {id:'quality',name:'قياس الجودة',members:['عبدالله','منى'],note:''},
     {id:'social',name:'السوشل ميديا',members:['خالد','دانة'],note:''}
@@ -300,7 +341,7 @@ button:hover{filter:brightness(1.08)}
       if(urg) nums.appendChild(h('span',{class:'count u',text:String(urg),title:'مستعجل'}));
       nums.appendChild(h('span',{class:'count',text:String(open.length),title:'مفتوحة'}));
       var b = h('button',{type:'button',class:'dept'+(deptFilter===id?' on':''),on:function(){
-        deptFilter=id; creating=false; ensureSel(); render(); }},h('span',{text:name}),nums);
+        deptFilter=id; creating=false; if(id==='attendee') view='sessions'; ensureSel(); render(); }},h('span',{text:name}),nums);
       if(deptFilter===id) b.setAttribute('aria-current','true');
       nav.appendChild(b);
     }
@@ -334,7 +375,7 @@ button:hover{filter:brightness(1.08)}
         var body = h('span',{class:'body'},
           h('span',{class:'t-title',text:t.title}),
           h('span',{class:'t-meta'},h('span',{text:dept(curDept(t)).name+' · '+t.assignee}),h('span',{text:PILL[t.phase]}),h('span',{text:fmtDate(t.due)})));
-        var b = h('button',{type:'button',class:'t '+PRIO[k].cls+(t.id===sel?' sel':''),on:function(){ sel=t.id; creating=false; render(); }},bar,body);
+        var b = h('button',{type:'button',class:'t '+PRIO[k].cls+(t.id===sel?' sel':''),on:function(){ sel=t.id; creating=false; view='task'; render(); }},bar,body);
         ul.appendChild(h('li',{},b));
       });
       wrap.appendChild(ul); root.appendChild(wrap);
@@ -474,9 +515,204 @@ button:hover{filter:brightness(1.08)}
   function renderDetail(){
     var root = document.getElementById('detail'); root.textContent = '';
     if(creating){ renderCreate(root); return; }
+    if(deptFilter==='attendee'){
+      root.appendChild(h('div',{class:'tabs',role:'group','aria-label':'عرض قسم تجربة الحضور'},
+        h('button',{type:'button',class:'f'+(view==='sessions'?' on':''),on:function(){ view='sessions'; render(); },text:'لوحة الجلسات'}),
+        h('button',{type:'button',class:'f'+(view==='task'?' on':''),on:function(){ view='task'; render(); },text:'مهام القسم'})));
+      if(view==='sessions'){ renderBoard(root); return; }
+    }
     var t = sel ? get(sel) : null;
     if(!t){ root.appendChild(h('section',{class:'card'},h('p',{class:'empty',text:'اختر مهمة من القائمة لتشوف تفاصيلها ومسارها.'}))); return; }
     renderTask(root,t);
+  }
+
+
+  /* ---------- attendee experience: session board ---------- */
+  var view = 'task';
+  var PH = ['نزلت بالتقويم','توزيع الأدوار','تجهيز المكان','يوم الجلسة','بعد الجلسة','منتهية'];
+  var SETUP = ['ترتيب الكراسي','المايك','التكييف','الشكل العام للمكان','توزيع أماكن المشاركين حسب القسم','مراجعة الأدوار مع المشاركين'];
+  var WRAP = ['الصورة الجماعية','تجميع الأغراض وترتيب المكان'];
+  var POOL = ['ريم','تركي','هند','بدر','جود','منى','سعد','لمى'];
+  var KIND = {sponsor:'سبونسر أو علاقات عامة',complaint:'شكوى أو ملاحظة (المتابعة عند القسم الداخلي)',assign:'توزيع أو مشاركة جديدة',change:'تغيير (أُعلن في القروب العام)'};
+  var sid = 1, aid = 1, sessSel = 1;
+  var sessions = [], alerts = [];
+  function mkS(o){ o.id=sid++; o.vol=o.vol||[]; o.setup=o.setup||SETUP.map(function(){return false;}); o.wrap=o.wrap||WRAP.map(function(){return false;}); o.checkedIn=o.checkedIn||0; sessions.push(o); return o; }
+  function addAlert(sId,kind,text){ alerts.unshift({id:aid++,sid:sId,kind:kind,text:text,read:false}); }
+  mkS({title:'جلسة: كيف تبني علامتك الشخصية',date:isoPlus(2),venue:'قاعة الملتقى',registered:74,chairs:60,needed:6,team:['ريم','تركي','هند'],phase:2,setup:[true,true,true,false,false,false]});
+  mkS({title:'جلسة: أساسيات التصوير بالجوال',date:isoPlus(9),venue:'مساحة العمل المشتركة',registered:32,chairs:40,needed:4,team:['ريم','بدر','جود','منى'],phase:1});
+  mkS({title:'جلسة: القيادة في فريق تطوعي',date:isoPlus(16),venue:'قاعة الملتقى',registered:20,chairs:60,needed:5,team:[],phase:0});
+  mkS({title:'جلسة: بناء مجتمع على الإنترنت',date:isoPlus(-3),venue:'قاعة الملتقى',registered:55,chairs:50,needed:5,team:['ريم','تركي','هند','بدر','جود'],phase:4,checkedIn:52,setup:SETUP.map(function(){return true;})});
+  addAlert(4,'complaint','ملاحظة من الحضور عن ضيق المقاعد في الجلسة.');
+  addAlert(2,'assign','أُضيف مشارك جديد (منى) على الجلسة.');
+  addAlert(1,'change','تغيّر وقت الجلسة إلى 7:30 م.');
+  addAlert(1,'sponsor','سبونسر جديد يحتاج تنسيق توزيع مع العلاقات العامة.');
+  alerts.forEach(function(a){ if(a.sid===2) a.read=true; });
+
+  function gs(id){ return sessions.filter(function(x){return x.id===id;})[0]; }
+  function daysLeft(x){ var a=new Date(x.date+'T00:00:00'), b=new Date(); b.setHours(0,0,0,0); return Math.round((a-b)/864e5); }
+  function crew(x){ return x.team.length + x.vol.length; }
+  function reasons(x){
+    var r = [];
+    if(x.phase>=5) return r;
+    if(x.phase<4 && crew(x)<x.needed) r.push('ينقص '+(x.needed-crew(x))+' مشارك');
+    if(x.registered>x.chairs) r.push('المسجلون ('+x.registered+') أكثر من الكراسي ('+x.chairs+')');
+    if(x.phase<3 && daysLeft(x)<=3 && x.setup.some(function(v){return !v;})) r.push('التجهيز غير مكتمل');
+    var n = alerts.filter(function(a){return a.sid===x.id && !a.read;}).length;
+    if(n) r.push(n+' تنبيه جديد');
+    return r;
+  }
+  function relDays(x){ var d=daysLeft(x); return d===0?'اليوم':d===1?'بكرة':d>1?'بعد '+d+' أيام':'قبل '+(-d)+' أيام'; }
+  function bump(fn){ return function(){ fn(); render(); }; }
+
+  function renderBoard(root){
+    var open = sessions.filter(function(x){return x.phase<5;});
+    var need = open.filter(function(x){return reasons(x).length;});
+    var short = open.filter(function(x){return x.phase<4 && crew(x)<x.needed;}).length;
+    var unread = alerts.filter(function(a){return !a.read;}).length;
+    var stats = h('div',{class:'stats'});
+    function stat(n,l,w){ stats.appendChild(h('div',{class:'stat'+(w&&n?' warn':'')},h('b',{text:String(n)}),h('span',{text:l}))); }
+    stat(open.length,'جلسات مفتوحة');
+    stat(need.length,'تحتاج متابعة',true);
+    stat(short,'جلسات ينقصها مشاركون',true);
+    stat(unread,'تنبيهات جديدة',true);
+    root.appendChild(h('section',{class:'card'},h('h2',{text:'وش عندي؟'}),stats));
+
+    /* alerts */
+    var ac = h('section',{class:'card'},h('h2',{text:'التنبيهات'}));
+    var ul = h('ul',{class:'al-list'});
+    if(!alerts.length) ul.appendChild(h('li',{},h('p',{class:'empty',text:'ما فيه تنبيهات.'})));
+    alerts.slice(0,8).forEach(function(a){
+      var sx = gs(a.sid);
+      var body = h('div',{class:'al-body'},h('p',{class:'al-kind',text:KIND[a.kind]+(sx?' · '+sx.title:'')}),h('p',{class:'al-text',text:a.text}));
+      var li = h('li',{class:'al k-'+a.kind+(a.read?'':' unread')},body);
+      if(!a.read) li.appendChild(btn('b-ghost','تمت القراءة',bump(function(){ a.read=true; })));
+      ul.appendChild(li);
+    });
+    ac.appendChild(ul);
+    ac.appendChild(h('p',{class:'sim-title',text:'محاكاة وصول تنبيه'}));
+    var sims = h('div',{class:'btns'});
+    var tgt = function(){ return gs(sessSel) || sessions[0]; };
+    sims.appendChild(btn('b-sim','سبونسر جديد',bump(function(){ addAlert(tgt().id,'sponsor','سبونسر جديد يحتاج تنسيق مع العلاقات العامة في التوزيع.'); })));
+    sims.appendChild(btn('b-sim','وصلت شكوى',bump(function(){ addAlert(tgt().id,'complaint','وصلت ملاحظة من أحد الحضور. المتابعة النهائية عند القسم الداخلي.'); })));
+    sims.appendChild(btn('b-sim','تغيير وقت الجلسة',bump(function(){ addAlert(tgt().id,'change','تغيّر وقت الجلسة وأُرسل التغيير في القروب العام.'); })));
+    ac.appendChild(sims);
+    root.appendChild(ac);
+
+    /* sessions */
+    var sc = h('section',{class:'card'},h('h2',{text:'الجلسات والفرص'}));
+    var grid = h('div',{class:'sess-grid'});
+    sessions.slice().sort(function(a,b){ return (a.phase>=5)-(b.phase>=5) || a.date.localeCompare(b.date); }).forEach(function(x){
+      var b = h('button',{type:'button',class:'sc'+(x.id===sessSel?' sel':''),on:bump(function(){ sessSel=x.id; })},
+        h('b',{text:x.title}),
+        h('small',{text:fmtDate(x.date)+' · '+relDays(x)+' · '+x.venue}),
+        h('small',{text:PH[x.phase]+' · المشاركون '+crew(x)+' من '+x.needed}));
+      reasons(x).forEach(function(r){ b.appendChild(h('span',{class:'flag',text:r})); });
+      grid.appendChild(b);
+    });
+    sc.appendChild(grid);
+    root.appendChild(sc);
+
+    var x = gs(sessSel);
+    if(x) root.appendChild(renderSession(x));
+    root.appendChild(h('p',{class:'note',text:'الجلسات والأسماء والأعداد أمثلة للتجربة. الشكاوى والتقييمات تصل للقسم الداخلي وهنا تظهر لك للعلم فقط.'}));
+  }
+
+  function numField(id,labelText,x,key){
+    var inp = h('input',{id:id,type:'number',min:'0',value:String(x[key])});
+    inp.addEventListener('change',function(){ var v=parseInt(inp.value,10); x[key]=isNaN(v)||v<0?0:v; render(); });
+    return field(id,labelText,inp);
+  }
+  function checklist(x,list,arr){
+    var box = h('div',{});
+    list.forEach(function(name,i){
+      var cb = h('input',{type:'checkbox',id:'c-'+x.id+'-'+arr+'-'+i});
+      cb.checked = !!x[arr][i];
+      cb.addEventListener('change',function(){ x[arr][i]=cb.checked; render(); });
+      box.appendChild(h('label',{class:'chk',for:'c-'+x.id+'-'+arr+'-'+i},cb,h('span',{text:name})));
+    });
+    return box;
+  }
+  function renderSession(x){
+    var card = h('section',{class:'card'});
+    card.appendChild(h('div',{class:'d-top'},h('h2',{class:'d-title',text:x.title}),h('span',{class:'pill st',text:PH[x.phase]})));
+    card.appendChild(h('p',{class:'dept-note',text:fmtDate(x.date)+' ('+relDays(x)+') · '+x.venue}));
+
+    var steps = h('ol',{class:'steps s6','aria-label':'مراحل الجلسة'});
+    PH.forEach(function(name,i){
+      var c = i<x.phase || x.phase===5 ? 'done' : (i===x.phase?'current':'');
+      var li = h('li',{class:c},h('span',{class:'dot',text:c==='done'?'✓':String(i+1)}),h('span',{text:name}));
+      if(i===x.phase && x.phase<5) li.setAttribute('aria-current','step');
+      steps.appendChild(li);
+    });
+    card.appendChild(steps);
+
+    var rs = reasons(x);
+    if(rs.length){
+      card.appendChild(h('p',{class:'sub-h',text:'تحتاج متابعة'}));
+      rs.forEach(function(r){ card.appendChild(h('p',{class:'warn-text',text:'• '+r})); });
+    } else if(x.phase<5){
+      card.appendChild(h('p',{class:'ok-text',text:'ما فيه شي يحتاج متابعة حاليًا.'}));
+    }
+
+    /* capacity */
+    card.appendChild(h('p',{class:'sub-h',text:'المسجلون والكراسي'}));
+    card.appendChild(h('div',{class:'row'},numField('n-reg-'+x.id,'عدد المسجلين',x,'registered'),numField('n-ch-'+x.id,'عدد الكراسي',x,'chairs')));
+    var pct = x.chairs ? Math.min(100, Math.round(x.registered/x.chairs*100)) : 100;
+    var over = x.registered > x.chairs;
+    var m = h('div',{class:'meter'+(over?' over':''),role:'img','aria-label':'نسبة المسجلين إلى الكراسي'},h('i',{style:'width:'+pct+'%'}));
+    card.appendChild(m);
+    card.appendChild(h('p',{class:over?'warn-text':'ok-text',text: over ? 'ينقص '+(x.registered-x.chairs)+' كرسي لتغطية كل المسجلين.' : 'الكراسي تكفي المسجلين.'}));
+
+    /* crew */
+    card.appendChild(h('p',{class:'sub-h',text:'المشاركون ('+crew(x)+' من '+x.needed+')'}));
+    var chips = h('div',{class:'chips'});
+    if(!crew(x)) chips.appendChild(h('span',{class:'empty',text:'ما تم توزيع أحد بعد.'}));
+    x.team.forEach(function(n){ chips.appendChild(h('span',{class:'pchip',text:n})); });
+    x.vol.forEach(function(n){ chips.appendChild(h('span',{class:'pchip vol',text:n})); });
+    card.appendChild(chips);
+    if(x.phase<4){
+      var free = POOL.filter(function(n){ return x.team.indexOf(n)<0; });
+      var pick = opts(h('select',{id:'p-'+x.id}), free.map(function(n){return [n,n];}), '');
+      var vd = opts(h('select',{id:'v-'+x.id}), DEPTS.filter(function(d){return d.id!=='attendee';}).map(function(d){return [d.id,d.name];}), '');
+      card.appendChild(h('div',{class:'row'},field('p-'+x.id,'أضف من الفريق',pick),
+        btn('b-ghost','أضف',bump(function(){ var v=pick.value; if(v && x.team.indexOf(v)<0){ x.team.push(v); addAlert(x.id,'assign','أُضيف '+v+' على الجلسة «'+x.title+'».'); } }))));
+      card.appendChild(h('div',{class:'row'},field('v-'+x.id,'استعن بمتطوع من قسم آخر',vd),
+        btn('b-ghost','أضف متطوعًا',bump(function(){
+          var d = dept(vd.value); var nm = 'متطوع من '+d.name; x.vol.push(nm);
+          addAlert(x.id,'assign','أُضيف '+nm+' على الجلسة «'+x.title+'».'); }))));
+    }
+
+    /* phase action */
+    card.appendChild(h('p',{class:'sub-h',text:'الخطوة الحالية'}));
+    var btns = h('div',{class:'btns'});
+    if(x.phase===0){
+      card.appendChild(h('p',{class:'hint',text:'راجع مين صوّت أو أبدى رغبته في المشاركة ثم وزّع الأدوار حسب احتياج الفرصة.'}));
+      btns.appendChild(btn('b-main','ابدأ توزيع الأدوار',bump(function(){ x.phase=1; })));
+    } else if(x.phase===1){
+      card.appendChild(h('p',{class:'hint',text:'وزّع الأدوار وانشر جدول المسؤوليات في قروب تجربة الحضور. إذا العدد ناقص استعن بمتطوعين.'}));
+      btns.appendChild(btn('b-main','تم التوزيع، ابدأ التجهيز',bump(function(){ x.phase=2; })));
+    } else if(x.phase===2){
+      card.appendChild(h('p',{class:'hint',text:'تأكد من المكان قبل الجلسة بوقت كافي.'}));
+      card.appendChild(checklist(x,SETUP,'setup'));
+      var left = x.setup.filter(function(v){return !v;}).length;
+      if(left) card.appendChild(h('p',{class:'warn-text',text:'باقي '+left+' بند في التجهيز.'}));
+      btns.appendChild(btn('b-main','المكان جاهز، ابدأ الجلسة',bump(function(){ x.phase=3; })));
+    } else if(x.phase===3){
+      card.appendChild(h('p',{class:'hint',text:'الحاضر يمسح الباركود عند الدخول ويُختم الكرت.'}));
+      card.appendChild(h('p',{class:'ok-text',text:'دخل '+x.checkedIn+' من '+x.registered+' مسجل.'}));
+      if(x.checkedIn>x.chairs) card.appendChild(h('p',{class:'warn-text',text:'الحضور تجاوز الكراسي بـ '+(x.checkedIn-x.chairs)+'.'}));
+      btns.appendChild(btn('b-ghost','مسح باركود وختم الكرت (+1)',bump(function(){ x.checkedIn++; })));
+      btns.appendChild(btn('b-ghost','+5',bump(function(){ x.checkedIn+=5; })));
+      btns.appendChild(btn('b-main','انتهت الجلسة',bump(function(){ x.phase=4; })));
+    } else if(x.phase===4){
+      card.appendChild(h('p',{class:'hint',text:'بعد الجلسة: الصورة الجماعية وترتيب الأغراض، وبعدها ينتهي دورك التشغيلي.'}));
+      card.appendChild(checklist(x,WRAP,'wrap'));
+      btns.appendChild(btn('b-main','أنهِ دوري التشغيلي',bump(function(){ x.phase=5; })));
+    } else {
+      card.appendChild(h('p',{class:'hint',text:'الجلسة منتهية. حضر '+x.checkedIn+' من '+x.registered+' مسجل.'}));
+    }
+    card.appendChild(btns);
+    return card;
   }
 
   document.getElementById('new-btn').addEventListener('click',function(){ creating=true; render(); document.getElementById('detail').scrollIntoView({block:'start'}); });
