@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}</style>
+<title>دجه</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: right-to-left three-pane workspace. Departments (right) | task list grouped by priority (middle) | selected task workflow (left).
+   Priority colors: red = urgent, amber = medium, green = not urgent. Brand teal is for actions. */
+:root{
+  --bg:#FFFFFF; --soft:#F3F5F7; color-scheme:light; --surface:#FFFFFF; --ink:#13202B; --muted:#586977; --line:#D6DEE5;
+  --brand:#0B7A77; --brand-bg:#DDF0EF;
+  --urgent:#C4342A; --urgent-bg:#FBE3E0;
+  --mid:#A86A0A; --mid-bg:#FBEBCB;
+  --low:#1D7F55; --low-bg:#D8F0E3;
+  --font-display:'Noto Sans Arabic',Tahoma,'Segoe UI',sans-serif;
+  --font-body:'Noto Sans Arabic',Tahoma,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.7}
+.wrap{max-width:1280px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px;margin-bottom:16px}
+.brand{font-family:var(--font-display);font-weight:700;font-size:38px;line-height:1;color:var(--brand);margin:0}
+.brand small{font-family:var(--font-body);font-weight:400;font-size:14px;color:var(--muted);margin-inline-start:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+h2{font-family:var(--font-display);font-weight:600;font-size:18px;margin:0 0 10px;text-wrap:balance}
+.label{font-size:12px;letter-spacing:.04em;color:var(--muted);margin:0 0 4px}
+
+.shell{display:grid;grid-template-columns:210px 330px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1100px){.shell{grid-template-columns:210px minmax(0,1fr)}.detail{grid-column:1/-1}}
+@media (max-width:720px){.shell{grid-template-columns:minmax(0,1fr)}}
+
+/* departments */
+.depts{display:flex;flex-direction:column;gap:4px;padding:10px}
+.depts .label{padding:2px 8px}
+.dept{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:start;background:transparent;color:var(--ink);border:1px solid transparent;border-radius:8px;padding:8px 10px;font-weight:500}
+.dept:hover{background:var(--soft)}
+.dept.on{background:var(--brand-bg);border-color:var(--brand);color:var(--ink)}
+.dept .nums{display:flex;gap:4px;flex-shrink:0}
+.count{min-width:24px;text-align:center;border-radius:999px;font-size:12px;padding:0 7px;background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.count.u{background:var(--urgent);color:var(--surface);border-color:var(--urgent);font-weight:600}
+@media (max-width:720px){
+  .depts{flex-direction:row;overflow-x:auto;padding:8px}
+  .depts .label{display:none}
+  .dept{width:auto;white-space:nowrap}
+}
+
+/* list */
+.dept-note{font-size:13px;color:var(--muted);margin:0 0 10px}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.f{font-size:13px;padding:2px 10px;border-radius:999px;background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.f.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.group{margin-bottom:12px}
+.gh{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin:0 0 6px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.u-bg{background:var(--urgent)}.m-bg{background:var(--mid)}.l-bg{background:var(--low)}
+.tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.t{display:grid;grid-template-columns:6px minmax(0,1fr);width:100%;text-align:start;padding:0;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;overflow:hidden;font-weight:400}
+.t .bar{display:block}
+.t .body{padding:8px 12px;min-width:0}
+.t.u{background:var(--urgent-bg)}.t.m{background:var(--mid-bg)}.t.l{background:var(--low-bg)}
+.t.sel{outline:2px solid var(--brand);outline-offset:1px}
+.t-title{display:block;font-weight:600;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.t-meta{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12px;color:var(--muted)}
+.empty{color:var(--muted);font-size:14px;margin:0}
+
+/* detail */
+.detail{display:flex;flex-direction:column;gap:16px;min-width:0}
+.d-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;align-items:flex-start}
+.d-title{font-size:19px;font-weight:600;margin:0;min-width:0;overflow-wrap:anywhere}
+.badges{display:flex;flex-wrap:wrap;gap:6px}
+.pill{display:inline-block;padding:1px 12px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap;border:1px solid transparent}
+.pill.urgent{background:var(--urgent-bg);color:var(--urgent);border-color:var(--urgent)}
+.pill.mid{background:var(--mid-bg);color:var(--mid);border-color:var(--mid)}
+.pill.low{background:var(--low-bg);color:var(--low);border-color:var(--low)}
+.pill.st{background:var(--soft);color:var(--ink);border-color:var(--line)}
+.pill.st.blocked{background:var(--urgent-bg);color:var(--urgent);border-color:var(--urgent)}
+.pill.st.done{background:var(--brand);color:var(--surface);border-color:var(--brand)}
+.route{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 0;padding:0;list-style:none}
+.route li{font-size:13px;padding:1px 10px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
+.route li.cur{background:var(--brand-bg);border-color:var(--brand);color:var(--ink);font-weight:600}
+.route li.past{text-decoration:line-through}
+.route .ar{border:0;padding:0;color:var(--muted)}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:14px 0 0;padding:0}
+.meta div{min-width:0}
+.meta dt{font-size:12px;color:var(--muted)}
+.meta dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.blocknote{margin-top:14px;padding:10px 12px;border-radius:8px;background:var(--urgent-bg);color:var(--urgent);font-size:14px}
+
+.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));list-style:none;margin:0;padding:0}
+.steps li{position:relative;text-align:center;padding-top:34px;font-size:13px;color:var(--muted)}
+.steps li::before{content:"";position:absolute;top:12px;inset-inline:-50% 50%;height:2px;background:var(--line)}
+.steps li:first-child::before{display:none}
+.steps li.done::before,.steps li.current::before{background:var(--brand)}
+.dot{position:absolute;top:0;left:0;right:0;margin:0 auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--line);background:var(--surface);display:grid;place-items:center;font-size:12px;font-weight:600;z-index:1}
+.steps li.done .dot{background:var(--brand);border-color:var(--brand);color:var(--surface)}
+.steps li.current{color:var(--ink);font-weight:600}
+.steps li.current .dot{border-color:var(--brand);color:var(--brand)}
+.steps li.blocked .dot{border-color:var(--urgent);color:var(--urgent);background:var(--urgent-bg)}
+.steps li.blocked{color:var(--urgent)}
+
+.two{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.two{grid-template-columns:minmax(0,1fr)}}
+
+.turn{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.chip{display:inline-block;padding:1px 10px;border-radius:6px;font-size:13px;font-weight:600;background:var(--brand-bg);color:var(--ink);border:1px solid var(--brand)}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field.wide{grid-column:1/-1}
+label{font-size:13px;color:var(--muted)}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:64px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;font-weight:600;border-radius:8px;padding:8px 16px;cursor:pointer;border:1px solid transparent}
+.b-main{background:var(--brand);color:var(--surface)}
+.b-bad{background:var(--urgent);color:var(--surface)}
+.b-ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.b-sim{background:transparent;color:var(--mid);border:1px dashed var(--mid)}
+button:hover{filter:brightness(1.08)}
+.sim-title{margin:16px 0 6px;font-size:12px;color:var(--muted)}
+.hint{margin:14px 0 0;font-size:14px;color:var(--muted);max-width:62ch}
+
+.feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:460px;overflow-y:auto}
+.item{border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--soft)}
+.item.notify{border-inline-start:4px solid var(--mid)}
+.item.activity{border-inline-start:4px solid var(--brand)}
+.item-top{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.item-text{margin:0;font-size:14px;overflow-wrap:anywhere}
+.item-ch{margin:2px 0 0;font-size:12px;color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin:10px 0 0}
+@media (prefers-reduced-motion:no-preference){.item{animation:rise .25s ease-out}}
+@keyframes rise{from{opacity:.2;transform:translateY(-4px)}to{opacity:1;transform:none}}
+</style>
+
+<div class="wrap" dir="rtl" lang="ar">
+  <div class="top">
+    <h1 class="brand">دجه<small>مهام الأقسام</small></h1>
+    <button type="button" class="b-main" id="new-btn">+ مهمة جديدة</button>
+  </div>
+
+  <div class="shell">
+    <nav class="card depts" id="depts" aria-label="الأقسام"></nav>
+
+    <section class="card" aria-labelledby="l-h">
+      <h2 id="l-h">المهام</h2>
+      <p class="dept-note" id="dept-note"></p>
+      <div class="filters" id="filters" role="group" aria-label="تصفية حسب الأولوية"></div>
+      <div id="list"></div>
+    </section>
+
+    <main class="detail" id="detail"></main>
+  </div>
+  <p class="note">الأقسام والأسماء والمهام أمثلة للتجربة. التغييرات تبقى في هذه الصفحة فقط ولا تُحفظ بعد إغلاقها.</p>
+</div>
+
+<script>
+(function(){
+  var DEPTS = [
+    {id:'pr',name:'العلاقات العامة',members:['فهد','لمى'],note:'حجز مكان الجلسة والتواصل مع الجهة.'},
+    {id:'written',name:'المحتوى المكتوب',members:['نورة','ماجد'],note:''},
+    {id:'visual',name:'المحتوى المرئي',members:['سعد','هند'],note:''},
+    {id:'attendee',name:'تجربة الحضور',members:['ريم','تركي'],note:''},
+    {id:'digital',name:'الهوية الرقمية',members:['بدر','جود'],note:''},
+    {id:'quality',name:'قياس الجودة',members:['عبدالله','منى'],note:''},
+    {id:'social',name:'السوشل ميديا',members:['خالد','دانة'],note:''}
+  ];
+  var PRIO = {
+    urgent:{label:'مستعجل',cls:'u',order:0},
+    mid:{label:'متوسط',cls:'m',order:1},
+    low:{label:'غير مستعجل',cls:'l',order:2}
+  };
+  var PHASES = ['الإسناد','الاستلام','التنفيذ','المراجعة','الإنهاء'];
+  var PILL = {assigned:'بانتظار الاستلام',inprogress:'قيد العمل',blocked:'متوقفة',review:'بانتظار المراجعة',done:'مكتملة'};
+  var CH = 'داخل التطبيق · الجوال · الإيميل';
+
+  function dept(id){ return DEPTS.filter(function(d){return d.id===id;})[0]; }
+  function isoPlus(days){
+    var d = new Date(); d.setDate(d.getDate()+days);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function fmtDate(iso){
+    try { return new Date(iso+'T00:00:00').toLocaleDateString('ar-SA-u-nu-latn',{day:'numeric',month:'long'}); }
+    catch(e){ return iso; }
+  }
+  function h(tag, props){
+    var el = document.createElement(tag);
+    props = props || {};
+    Object.keys(props).forEach(function(k){
+      if(k==='class') el.className = props[k];
+      else if(k==='text') el.textContent = props[k];
+      else if(k==='on') el.addEventListener('click', props[k]);
+      else if(k==='change') el.addEventListener('change', props[k]);
+      else el.setAttribute(k, props[k]);
+    });
+    for(var i=2;i<arguments.length;i++){ if(arguments[i]) el.appendChild(arguments[i]); }
+    return el;
+  }
+  function val(id){ var e=document.getElementById(id); return e ? e.value.trim() : ''; }
+
+  /* ---------- data ---------- */
+  var nextId = 1;
+  var tasks = [];
+  var sel = null, deptFilter = 'all', prioFilter = 'all', creating = false;
+
+  function curDept(t){ return t.route[t.idx]; }
+  function pickMember(deptId, salt){ var m = dept(deptId).members; return m[salt % m.length]; }
+  function mk(o){
+    var t = {id:nextId++,title:o.title,prio:o.prio,due:isoPlus(o.days),route:o.route,idx:o.idx||0,phase:o.phase,
+      hours:0,blockReason:o.blockReason||'',blockWho:o.blockWho||'',feed:[]};
+    t.assignee = pickMember(curDept(t), t.id);
+    (o.feed||[]).forEach(function(f){ t.feed.push({kind:f[0],to:f[1],text:f[2],ch:f[3]||'',t:f[4]||0}); });
+    tasks.push(t);
+    return t;
+  }
+  function seed(){
+    mk({title:'حجز مكان الجلسة والتواصل مع الجهة المستضيفة',prio:'urgent',days:2,route:['pr'],phase:'assigned',
+      feed:[['notify','العضو (فهد)','رئيس القسم أسند لك مهمة جديدة: «حجز مكان الجلسة والتواصل مع الجهة المستضيفة».',CH,0]]});
+    mk({title:'كتابة نص إعلان الجلسة',prio:'mid',days:4,route:['written','visual','social','quality'],phase:'inprogress',
+      feed:[['activity','رئيس القسم','نشر المهمة وأسندها',' ',0],['activity','العضو','ضغط «استلمت المهمة»','',1]]});
+    mk({title:'تصميم بوستر الجلسة',prio:'urgent',days:3,route:['visual','social','quality'],phase:'blocked',
+      blockReason:'أنتظر النص النهائي من كتابة المحتوى',blockWho:'@نورة',
+      feed:[['activity','العضو','غيّر الحالة إلى متوقفة. السبب: أنتظر النص النهائي من كتابة المحتوى','',30]]});
+    mk({title:'جدولة منشورات الأسبوع',prio:'low',days:6,route:['social','quality'],phase:'review',
+      feed:[['notify','رئيس القسم','مهمة «جدولة منشورات الأسبوع» بانتظار مراجعتك.',CH,52]]});
+    mk({title:'مراجعة مواد الجلسة قبل النشر',prio:'mid',days:5,route:['quality'],phase:'assigned'});
+    mk({title:'مقال المدونة الشهري',prio:'low',days:9,route:['written','quality'],phase:'inprogress'});
+    mk({title:'تحديث قالب العروض التقديمية',prio:'mid',days:-1,route:['visual'],phase:'done',
+      feed:[['notify','كل المشاركين','انتهت المهمة «تحديث قالب العروض التقديمية».',CH,60]]});
+    mk({title:'تجهيز مسار استقبال الحضور وتسجيل الدخول',prio:'mid',days:4,route:['attendee','quality'],phase:'inprogress'});
+    mk({title:'تحديث ألوان الهوية على صفحة التسجيل',prio:'low',days:8,route:['digital','quality'],phase:'assigned'});
+    sel = 1;
+  }
+  seed();
+
+  function get(id){ return tasks.filter(function(t){return t.id===id;})[0]; }
+  function log(t,kind,to,text,ch){ t.feed.unshift({kind:kind,to:to,text:text,ch:ch||'',t:t.hours}); }
+  function who(t){ return 'العضو ('+t.assignee+')'; }
+
+  /* ---------- transitions ---------- */
+  var T = {
+    receive:function(t){ t.phase='inprogress';
+      log(t,'activity',who(t),'ضغط «استلمت المهمة»');
+      log(t,'notify','رئيس القسم',t.assignee+' استلم المهمة وتغيّرت حالتها إلى قيد العمل.',CH); },
+    noReceive:function(t){ t.hours+=24;
+      log(t,'notify',who(t),'تذكير: المهمة «'+t.title+'» ما زالت بانتظار استلامك.',CH);
+      log(t,'notify','رئيس القسم','مرّت 24 ساعة ولم يستلم '+t.assignee+' المهمة.',CH); },
+    update:function(t){ var c=val('f-comment');
+      log(t,'activity',who(t), c ? 'حدّث التقدم: '+c : 'حدّث تقدم المهمة'); },
+    stale:function(t){ t.hours+=48;
+      log(t,'notify',who(t),'ما فيه أي تحديث على «'+t.title+'» منذ يومين.',CH);
+      log(t,'notify','رئيس القسم','ما فيه أي تحديث من '+t.assignee+' منذ يومين.',CH); },
+    block:function(t){
+      t.blockReason = val('f-reason') || 'بدون سبب مكتوب'; t.blockWho = val('f-who'); t.phase='blocked';
+      log(t,'activity',who(t),'غيّر الحالة إلى متوقفة. السبب: '+t.blockReason);
+      log(t,'notify','المسؤول عن العائق'+(t.blockWho?' ('+t.blockWho+')':''),t.assignee+' ينتظر منك حلًّا لعائق: '+t.blockReason,CH);
+      log(t,'notify','رئيس القسم','المهمة «'+t.title+'» متوقفة بسبب عائق.',CH); },
+    resolve:function(t){ t.phase='inprogress'; t.blockReason=''; t.blockWho='';
+      log(t,'activity','رئيس القسم','حلّ العائق وأرجع المهمة قيد العمل');
+      log(t,'notify',who(t),'انحل العائق ورجعت المهمة قيد العمل.',CH); },
+    deliver:function(t){ t.phase='review';
+      log(t,'activity',who(t),'رفع الشغل وضغط «تم التسليم»');
+      log(t,'notify','رئيس القسم','مهمة «'+t.title+'» بانتظار مراجعتك.',CH); },
+    approve:function(t){
+      log(t,'activity','رئيس القسم','اعتمد الشغل');
+      if(t.idx+1 < t.route.length){
+        t.idx++; t.phase='assigned'; t.assignee = pickMember(curDept(t), t.id+t.idx);
+        log(t,'notify','النظام','فيه مرحلة تالية: المهمة تنتقل تلقائيًا إلى قسم '+dept(curDept(t)).name+'.','');
+        log(t,'notify',who(t),'انتقلت لك المهمة «'+t.title+'». موعد التسليم '+fmtDate(t.due)+'.',CH);
+      } else {
+        t.phase='done';
+        log(t,'notify','كل المشاركين','انتهت المهمة «'+t.title+'».',CH);
+      } },
+    edit:function(t){ var n = val('f-notes') || 'بدون ملاحظات مكتوبة'; t.phase='inprogress';
+      log(t,'activity','رئيس القسم','كتب ملاحظات وطلب تعديل: '+n);
+      log(t,'notify',who(t),'رئيس القسم طلب تعديلًا على «'+t.title+'»: '+n,CH); }
+  };
+  function go(name){ return function(){ var t=get(sel); if(t){ T[name](t); render(); } }; }
+
+  /* ---------- left/right panes ---------- */
+  function visible(){
+    return tasks.filter(function(t){
+      var okD = deptFilter==='all' || curDept(t)===deptFilter;
+      var okP = prioFilter==='all' || t.prio===prioFilter;
+      return okD && okP;
+    });
+  }
+  function renderDepts(){
+    var nav = document.getElementById('depts'); nav.textContent = '';
+    nav.appendChild(h('p',{class:'label',text:'الأقسام'}));
+    function item(id,name){
+      var open = tasks.filter(function(t){ return t.phase!=='done' && (id==='all' || curDept(t)===id); });
+      var urg = open.filter(function(t){ return t.prio==='urgent'; }).length;
+      var nums = h('span',{class:'nums'});
+      if(urg) nums.appendChild(h('span',{class:'count u',text:String(urg),title:'مستعجل'}));
+      nums.appendChild(h('span',{class:'count',text:String(open.length),title:'مفتوحة'}));
+      var b = h('button',{type:'button',class:'dept'+(deptFilter===id?' on':''),on:function(){
+        deptFilter=id; creating=false; ensureSel(); render(); }},h('span',{text:name}),nums);
+      if(deptFilter===id) b.setAttribute('aria-current','true');
+      nav.appendChild(b);
+    }
+    item('all','كل الأقسام');
+    DEPTS.forEach(function(d){ item(d.id,d.name); });
+  }
+  function ensureSel(){
+    var v = visible();
+    if(!v.some(function(t){return t.id===sel;})) sel = v.length ? v[0].id : null;
+  }
+  function renderList(){
+    var d = deptFilter==='all' ? null : dept(deptFilter);
+    document.getElementById('dept-note').textContent = d ? (d.note ? d.name+': '+d.note : d.name) : 'كل مهام الأقسام مرتبة حسب الأولوية.';
+    var fl = document.getElementById('filters'); fl.textContent = '';
+    [['all','الكل']].concat(Object.keys(PRIO).map(function(k){ return [k,PRIO[k].label]; })).forEach(function(p){
+      var n = tasks.filter(function(t){ return (deptFilter==='all'||curDept(t)===deptFilter) && (p[0]==='all'||t.prio===p[0]); }).length;
+      var b = h('button',{type:'button',class:'f'+(prioFilter===p[0]?' on':''),on:function(){ prioFilter=p[0]; ensureSel(); render(); },text:p[1]+' '+n});
+      fl.appendChild(b);
+    });
+    var root = document.getElementById('list'); root.textContent = '';
+    var v = visible();
+    if(!v.length){ root.appendChild(h('p',{class:'empty',text:'ما فيه مهام بهذا الفلتر.'})); return; }
+    Object.keys(PRIO).sort(function(a,b){return PRIO[a].order-PRIO[b].order;}).forEach(function(k){
+      var g = v.filter(function(t){return t.prio===k;}).sort(function(a,b){ return (a.phase==='done')-(b.phase==='done') || a.due.localeCompare(b.due); });
+      if(!g.length) return;
+      var wrap = h('div',{class:'group'});
+      wrap.appendChild(h('p',{class:'gh'},h('span',{class:'sw '+PRIO[k].cls+'-bg'}),h('span',{text:PRIO[k].label+' ('+g.length+')'})));
+      var ul = h('ul',{class:'tl'});
+      g.forEach(function(t){
+        var bar = h('span',{class:'bar '+PRIO[k].cls+'-bg'});
+        var body = h('span',{class:'body'},
+          h('span',{class:'t-title',text:t.title}),
+          h('span',{class:'t-meta'},h('span',{text:dept(curDept(t)).name+' · '+t.assignee}),h('span',{text:PILL[t.phase]}),h('span',{text:fmtDate(t.due)})));
+        var b = h('button',{type:'button',class:'t '+PRIO[k].cls+(t.id===sel?' sel':''),on:function(){ sel=t.id; creating=false; render(); }},bar,body);
+        ul.appendChild(h('li',{},b));
+      });
+      wrap.appendChild(ul); root.appendChild(wrap);
+    });
+  }
+
+  /* ---------- detail ---------- */
+  function field(id,labelText,control,wide){
+    return h('div',{class:'field'+(wide?' wide':'')},h('label',{for:id,text:labelText}),control);
+  }
+  function btn(cls,text,fn){ return h('button',{type:'button',class:cls,on:fn,text:text}); }
+  function opts(sel,list,cur){ list.forEach(function(o){ var op=h('option',{value:o[0],text:o[1]}); if(o[0]===cur) op.selected=true; sel.appendChild(op); }); return sel; }
+
+  function renderCreate(root){
+    var card = h('section',{class:'card'},h('h2',{text:'مهمة جديدة'}));
+    var first = DEPTS[0].id;
+    var deptSel = opts(h('select',{id:'n-dept',change:function(){
+      var asg = document.getElementById('n-asg'); asg.textContent='';
+      opts(asg, dept(deptSel.value).members.map(function(m){return [m,m];}), '');
+    }}), DEPTS.map(function(d){return [d.id,d.name];}), first);
+    var asg = opts(h('select',{id:'n-asg'}), dept(first).members.map(function(m){return [m,m];}), '');
+    var prio = opts(h('select',{id:'n-prio'}), Object.keys(PRIO).map(function(k){return [k,PRIO[k].label];}), 'mid');
+    var nextSel = opts(h('select',{id:'n-next'}), [['','بدون']].concat(DEPTS.map(function(d){return [d.id,d.name];})), '');
+    card.appendChild(h('div',{class:'fields'},
+      field('n-title','عنوان المهمة',h('input',{id:'n-title',type:'text',placeholder:'مثال: تجهيز تقرير الجلسة'}),true),
+      field('n-dept','القسم',deptSel),
+      field('n-asg','المسند إليه',asg),
+      field('n-prio','الأولوية',prio),
+      field('n-due','موعد التسليم',h('input',{id:'n-due',type:'date',value:isoPlus(5)})),
+      field('n-next','المرحلة التالية بعد الاعتماد',nextSel)));
+    card.appendChild(h('div',{class:'btns'},
+      btn('b-main','انشر المهمة وأسندها',function(){
+        var title = val('n-title'); if(!title){ document.getElementById('n-title').focus(); return; }
+        var d = val('n-dept'), nx = val('n-next');
+        var route = [d]; if(nx && nx!==d) route.push(nx);
+        var t = mk({title:title,prio:val('n-prio'),days:0,route:route,phase:'assigned'});
+        t.due = val('n-due') || isoPlus(5); t.assignee = val('n-asg') || t.assignee;
+        log(t,'activity','رئيس القسم','نشر المهمة وأسندها إلى @'+t.assignee);
+        log(t,'notify',who(t),'رئيس القسم أسند لك مهمة جديدة: «'+t.title+'». موعد التسليم '+fmtDate(t.due)+'.',CH);
+        sel = t.id; creating = false; deptFilter='all'; prioFilter='all'; render();
+      }),
+      btn('b-ghost','إلغاء',function(){ creating=false; render(); })));
+    root.appendChild(card);
+  }
+
+  function renderTask(root,t){
+    var cur = {assigned:1,inprogress:2,blocked:2,review:3,done:4}[t.phase];
+    var head = h('section',{class:'card'});
+    var badges = h('div',{class:'badges'},
+      h('span',{class:'pill '+t.prio,text:PRIO[t.prio].label}),
+      h('span',{class:'pill st '+t.phase,text:PILL[t.phase]}));
+    head.appendChild(h('div',{class:'d-top'},h('h2',{class:'d-title',text:t.title}),badges));
+    var route = h('ol',{class:'route','aria-label':'مسار المهمة بين الأقسام'});
+    t.route.forEach(function(id,i){
+      if(i) route.appendChild(h('li',{class:'ar','aria-hidden':'true',text:'←'}));
+      var c = i===t.idx ? (t.phase==='done'?'past':'cur') : (i<t.idx?'past':'');
+      route.appendChild(h('li',{class:c,text:dept(id).name}));
+    });
+    head.appendChild(route);
+    var meta = h('dl',{class:'meta'});
+    function row(k,v){ meta.appendChild(h('div',{},h('dt',{text:k}),h('dd',{text:v}))); }
+    row('القسم الحالي', dept(curDept(t)).name);
+    row('المسؤول', t.assignee);
+    row('موعد التسليم', fmtDate(t.due));
+    row('المرحلة', (t.idx+1)+' من '+t.route.length);
+    head.appendChild(meta);
+    if(t.phase==='blocked') head.appendChild(h('div',{class:'blocknote',text:'العائق: '+t.blockReason+(t.blockWho?' · بانتظار '+t.blockWho:'')}));
+    root.appendChild(head);
+
+    var steps = h('ol',{class:'steps','aria-label':'مراحل المهمة'});
+    PHASES.forEach(function(name,i){
+      var c = '';
+      if(t.phase==='done' || i<cur) c = 'done'; else if(i===cur) c = t.phase==='blocked' ? 'current blocked' : 'current';
+      var li = h('li',{class:c},h('span',{class:'dot',text:c==='done'?'✓':String(i+1)}),h('span',{text:name}));
+      if(i===cur && t.phase!=='done') li.setAttribute('aria-current','step');
+      steps.appendChild(li);
+    });
+    root.appendChild(h('section',{class:'card'},steps));
+
+    var two = h('div',{class:'two'});
+    two.appendChild(renderAction(t));
+    var fc = h('section',{class:'card'},h('h2',{text:'الإشعارات والنشاط'}));
+    var ul = h('ul',{class:'feed'});
+    if(!t.feed.length) ul.appendChild(h('li',{},h('p',{class:'empty',text:'ما فيه نشاط بعد على هذه المهمة.'})));
+    t.feed.forEach(function(f){
+      var li = h('li',{class:'item '+f.kind},
+        h('div',{class:'item-top'},h('span',{text:f.kind==='notify'?'إشعار إلى '+f.to:f.to}),h('span',{text:'الساعة '+f.t})),
+        h('p',{class:'item-text',text:f.text}));
+      if(f.ch && f.ch.trim()) li.appendChild(h('p',{class:'item-ch',text:f.ch}));
+      ul.appendChild(li);
+    });
+    fc.appendChild(ul); two.appendChild(fc);
+    root.appendChild(two);
+  }
+
+  function renderAction(t){
+    var card = h('section',{class:'card'},h('h2',{text:'الخطوة الحالية'}));
+    function turn(who,text){ card.appendChild(h('div',{class:'turn'},h('span',{class:'label',style:'margin:0',text:'الدور على'}),h('span',{class:'chip',text:who}),h('span',{text:text}))); }
+    var btns = h('div',{class:'btns'}), sims=null, hint='';
+    if(t.phase==='assigned'){
+      turn(t.assignee,'يستلم المهمة');
+      btns.appendChild(btn('b-main','استلمت المهمة',go('receive')));
+      sims = [btn('b-sim','مرّت 24 ساعة بدون استلام',go('noReceive'))];
+      hint = 'وصل العضو إشعار فوري داخل التطبيق وعلى الجوال والإيميل. إذا ما استلم خلال 24 ساعة يرسل النظام تذكيرًا له وتنبيهًا لرئيس القسم.';
+    } else if(t.phase==='inprogress'){
+      turn(t.assignee,'يشتغل على المهمة');
+      card.appendChild(h('div',{class:'fields'},
+        field('f-comment','تعليق أو تحديث للتقدم',h('input',{id:'f-comment',type:'text',placeholder:'مثال: خلصت نصف المطلوب'}),true),
+        field('f-reason','سبب العائق (إذا فيه)',h('input',{id:'f-reason',type:'text',placeholder:'مثال: أنتظر ملفات'})),
+        field('f-who','منشن الشخص اللي تنتظر منه',h('input',{id:'f-who',type:'text',placeholder:'@اسم الشخص'}))));
+      btns.appendChild(btn('b-ghost','أضف تحديثًا',go('update')));
+      btns.appendChild(btn('b-bad','فيه عائق يوقف الشغل',go('block')));
+      btns.appendChild(btn('b-main','سلّمت الشغل',go('deliver')));
+      sims = [btn('b-sim','مرّ يومان بدون تحديث',go('stale'))];
+      hint = 'إذا خلص الشغل يرفع العضو الملفات ويضغط «تم التسليم». وإذا مرّ يومان بدون تحديث ينبّه النظام العضو ورئيس القسم.';
+    } else if(t.phase==='blocked'){
+      turn('رئيس القسم أو المعني','يحل العائق');
+      btns.appendChild(btn('b-main','انحل العائق',go('resolve')));
+      hint = 'أُشعر المسؤول عن العائق ورئيس القسم. بعد الحل ترجع المهمة قيد العمل عند العضو.';
+    } else if(t.phase==='review'){
+      turn('رئيس القسم','يراجع الشغل');
+      card.appendChild(h('div',{class:'fields'},field('f-notes','ملاحظات التعديل (إذا يحتاج تعديل)',h('textarea',{id:'f-notes',placeholder:'اكتب الملاحظات ورئيس القسم يمنشن العضو'}),true)));
+      btns.appendChild(btn('b-main','اعتمد الشغل',go('approve')));
+      btns.appendChild(btn('b-ghost','يحتاج تعديل',go('edit')));
+      var nxt = t.idx+1 < t.route.length ? 'تنتقل المهمة تلقائيًا إلى قسم '+dept(t.route[t.idx+1]).name+' بإشعار ومنشن.' : 'ما فيه مرحلة تالية، فيصل إشعار الإنهاء لكل المشاركين.';
+      hint = 'عند الاعتماد: '+nxt;
+    } else {
+      card.appendChild(h('div',{class:'turn'},h('span',{class:'chip',text:'النظام'}),h('span',{text:'أُرسل إشعار الإنهاء لكل المشاركين في المهمة.'})));
+      hint = 'المهمة مكتملة.';
+    }
+    card.appendChild(btns);
+    if(sims){ card.appendChild(h('p',{class:'sim-title',text:'مرور الوقت (محاكاة)'})); var sb=h('div',{class:'btns'}); sims.forEach(function(s){sb.appendChild(s);}); card.appendChild(sb); }
+    if(hint) card.appendChild(h('p',{class:'hint',text:hint}));
+    return card;
+  }
+
+  function renderDetail(){
+    var root = document.getElementById('detail'); root.textContent = '';
+    if(creating){ renderCreate(root); return; }
+    var t = sel ? get(sel) : null;
+    if(!t){ root.appendChild(h('section',{class:'card'},h('p',{class:'empty',text:'اختر مهمة من القائمة لتشوف تفاصيلها ومسارها.'}))); return; }
+    renderTask(root,t);
+  }
+
+  document.getElementById('new-btn').addEventListener('click',function(){ creating=true; render(); document.getElementById('detail').scrollIntoView({block:'start'}); });
+  function render(){ renderDepts(); renderList(); renderDetail(); }
+  render();
+})();
+</script>
+
+</html>
