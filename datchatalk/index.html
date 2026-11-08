@@ -534,19 +534,15 @@ button:hover{filter:brightness(1.08)}
   var WRAP = ['الصورة الجماعية','تجميع الأغراض وترتيب المكان'];
   var POOL = ['ريم','تركي','هند','بدر','جود','منى','سعد','لمى'];
   var KIND = {sponsor:'سبونسر أو علاقات عامة',complaint:'شكوى أو ملاحظة (المتابعة عند القسم الداخلي)',assign:'توزيع أو مشاركة جديدة',change:'تغيير (أُعلن في القروب العام)'};
-  var sid = 1, aid = 1, sessSel = 1;
+  var sid = 1, aid = 1, sessSel = 2;
   var sessions = [], alerts = [];
   function mkS(o){ o.id=sid++; o.vol=o.vol||[]; o.setup=o.setup||SETUP.map(function(){return false;}); o.wrap=o.wrap||WRAP.map(function(){return false;}); o.checkedIn=o.checkedIn||0; sessions.push(o); return o; }
   function addAlert(sId,kind,text){ alerts.unshift({id:aid++,sid:sId,kind:kind,text:text,read:false}); }
-  mkS({title:'جلسة: كيف تبني علامتك الشخصية',date:isoPlus(2),venue:'قاعة الملتقى',registered:74,chairs:60,needed:6,team:['ريم','تركي','هند'],phase:2,setup:[true,true,true,false,false,false]});
-  mkS({title:'جلسة: أساسيات التصوير بالجوال',date:isoPlus(9),venue:'مساحة العمل المشتركة',registered:32,chairs:40,needed:4,team:['ريم','بدر','جود','منى'],phase:1});
-  mkS({title:'جلسة: القيادة في فريق تطوعي',date:isoPlus(16),venue:'قاعة الملتقى',registered:20,chairs:60,needed:5,team:[],phase:0});
-  mkS({title:'جلسة: بناء مجتمع على الإنترنت',date:isoPlus(-3),venue:'قاعة الملتقى',registered:55,chairs:50,needed:5,team:['ريم','تركي','هند','بدر','جود'],phase:4,checkedIn:52,setup:SETUP.map(function(){return true;})});
-  addAlert(4,'complaint','ملاحظة من الحضور عن ضيق المقاعد في الجلسة.');
-  addAlert(2,'assign','أُضيف مشارك جديد (منى) على الجلسة.');
-  addAlert(1,'change','تغيّر وقت الجلسة إلى 7:30 م.');
-  addAlert(1,'sponsor','سبونسر جديد يحتاج تنسيق توزيع مع العلاقات العامة.');
-  alerts.forEach(function(a){ if(a.sid===2) a.read=true; });
+  mkS({title:'منطق العقل وجموح الخيال',time:'7:30 م',date:'2026-11-07',venue:'',registered:0,chairs:0,needed:0,team:[],phase:4});
+  mkS({title:'سيكولوجيا التميز',time:'7:30 م',date:'2026-11-21',venue:'',registered:0,chairs:0,needed:0,team:[],phase:0});
+  mkS({title:'جلسة دجه (العنوان لم يُعلن بعد)',time:'7:00 م',date:'2026-12-05',venue:'',registered:0,chairs:0,needed:0,team:[],phase:0});
+  mkS({title:'جلسة دجه (العنوان لم يُعلن بعد)',time:'7:00 م',date:'2026-12-19',venue:'',registered:0,chairs:0,needed:0,team:[],phase:0});
+  sessSel = 2;
 
   function gs(id){ return sessions.filter(function(x){return x.id===id;})[0]; }
   function daysLeft(x){ var a=new Date(x.date+'T00:00:00'), b=new Date(); b.setHours(0,0,0,0); return Math.round((a-b)/864e5); }
@@ -554,13 +550,15 @@ button:hover{filter:brightness(1.08)}
   function reasons(x){
     var r = [];
     if(x.phase>=5) return r;
+    if(x.phase<4 && (!x.needed || !x.chairs)) r.push('أكمل عدد المشاركين والكراسي');
     if(x.phase<4 && crew(x)<x.needed) r.push('ينقص '+(x.needed-crew(x))+' مشارك');
-    if(x.registered>x.chairs) r.push('المسجلون ('+x.registered+') أكثر من الكراسي ('+x.chairs+')');
+    if(x.chairs>0 && x.registered>x.chairs) r.push('المسجلون ('+x.registered+') أكثر من الكراسي ('+x.chairs+')');
     if(x.phase<3 && daysLeft(x)<=3 && x.setup.some(function(v){return !v;})) r.push('التجهيز غير مكتمل');
     var n = alerts.filter(function(a){return a.sid===x.id && !a.read;}).length;
     if(n) r.push(n+' تنبيه جديد');
     return r;
   }
+  function vtxt(x){ return (x.time?x.time+' · ':'')+(x.venue||'المكان لم يُحدد'); }
   function relDays(x){ var d=daysLeft(x); return d===0?'اليوم':d===1?'بكرة':d>1?'بعد '+d+' أيام':'قبل '+(-d)+' أيام'; }
   function bump(fn){ return function(){ fn(); render(); }; }
 
@@ -604,7 +602,7 @@ button:hover{filter:brightness(1.08)}
     sessions.slice().sort(function(a,b){ return (a.phase>=5)-(b.phase>=5) || a.date.localeCompare(b.date); }).forEach(function(x){
       var b = h('button',{type:'button',class:'sc'+(x.id===sessSel?' sel':''),on:bump(function(){ sessSel=x.id; })},
         h('b',{text:x.title}),
-        h('small',{text:fmtDate(x.date)+' · '+relDays(x)+' · '+x.venue}),
+        h('small',{text:fmtDate(x.date)+' · '+relDays(x)+' · '+vtxt(x)}),
         h('small',{text:PH[x.phase]+' · المشاركون '+crew(x)+' من '+x.needed}));
       reasons(x).forEach(function(r){ b.appendChild(h('span',{class:'flag',text:r})); });
       grid.appendChild(b);
@@ -612,9 +610,23 @@ button:hover{filter:brightness(1.08)}
     sc.appendChild(grid);
     root.appendChild(sc);
 
+    var det = h('details',{class:'card'},h('summary',{text:'إضافة جلسة جديدة من التقويم'}));
+    det.appendChild(h('div',{class:'fields',style:'margin-top:12px'},
+      field('a-title','عنوان الجلسة',h('input',{id:'a-title',type:'text'}),true),
+      field('a-date','التاريخ',h('input',{id:'a-date',type:'date'})),
+      field('a-time','الوقت',h('input',{id:'a-time',type:'text',placeholder:'7:30 م'})),
+      field('a-venue','المكان',h('input',{id:'a-venue',type:'text'}))));
+    det.appendChild(btn('b-main','أضف الجلسة',function(){
+      var t=val('a-title'), d=val('a-date');
+      if(!t){ document.getElementById('a-title').focus(); return; }
+      if(!d){ document.getElementById('a-date').focus(); return; }
+      var n = mkS({title:t,time:val('a-time'),date:d,venue:val('a-venue'),registered:0,chairs:0,needed:0,team:[],phase:0});
+      sessSel = n.id; render();
+    }));
+    root.appendChild(det);
     var x = gs(sessSel);
     if(x) root.appendChild(renderSession(x));
-    root.appendChild(h('p',{class:'note',text:'الجلسات والأسماء والأعداد أمثلة للتجربة. الشكاوى والتقييمات تصل للقسم الداخلي وهنا تظهر لك للعلم فقط.'}));
+    root.appendChild(h('p',{class:'note',text:'مواعيد الجلسات من تقويم الشهر. أسماء الفريق في القوائم أمثلة، وأعداد المسجلين والكراسي تدخلها أنت. الشكاوى والتقييمات تصل للقسم الداخلي وهنا تظهر لك للعلم فقط.'}));
   }
 
   function numField(id,labelText,x,key){
@@ -635,7 +647,7 @@ button:hover{filter:brightness(1.08)}
   function renderSession(x){
     var card = h('section',{class:'card'});
     card.appendChild(h('div',{class:'d-top'},h('h2',{class:'d-title',text:x.title}),h('span',{class:'pill st',text:PH[x.phase]})));
-    card.appendChild(h('p',{class:'dept-note',text:fmtDate(x.date)+' ('+relDays(x)+') · '+x.venue}));
+    card.appendChild(h('p',{class:'dept-note',text:fmtDate(x.date)+' ('+relDays(x)+') · '+vtxt(x)}));
 
     var steps = h('ol',{class:'steps s6','aria-label':'مراحل الجلسة'});
     PH.forEach(function(name,i){
@@ -657,14 +669,15 @@ button:hover{filter:brightness(1.08)}
     /* capacity */
     card.appendChild(h('p',{class:'sub-h',text:'المسجلون والكراسي'}));
     card.appendChild(h('div',{class:'row'},numField('n-reg-'+x.id,'عدد المسجلين',x,'registered'),numField('n-ch-'+x.id,'عدد الكراسي',x,'chairs')));
-    var pct = x.chairs ? Math.min(100, Math.round(x.registered/x.chairs*100)) : 100;
-    var over = x.registered > x.chairs;
+    var pct = x.chairs ? Math.min(100, Math.round(x.registered/x.chairs*100)) : 0;
+    var over = x.chairs>0 && x.registered > x.chairs;
     var m = h('div',{class:'meter'+(over?' over':''),role:'img','aria-label':'نسبة المسجلين إلى الكراسي'},h('i',{style:'width:'+pct+'%'}));
     card.appendChild(m);
-    card.appendChild(h('p',{class:over?'warn-text':'ok-text',text: over ? 'ينقص '+(x.registered-x.chairs)+' كرسي لتغطية كل المسجلين.' : 'الكراسي تكفي المسجلين.'}));
+    card.appendChild(h('p',{class:(over||!x.chairs)?'warn-text':'ok-text',text: !x.chairs ? 'لم يُحدد عدد الكراسي بعد.' : over ? 'ينقص '+(x.registered-x.chairs)+' كرسي لتغطية كل المسجلين.' : 'الكراسي تكفي المسجلين.'}));
 
     /* crew */
     card.appendChild(h('p',{class:'sub-h',text:'المشاركون ('+crew(x)+' من '+x.needed+')'}));
+    card.appendChild(h('div',{class:'row'},numField('n-need-'+x.id,'عدد المشاركين المطلوب',x,'needed')));
     var chips = h('div',{class:'chips'});
     if(!crew(x)) chips.appendChild(h('span',{class:'empty',text:'ما تم توزيع أحد بعد.'}));
     x.team.forEach(function(n){ chips.appendChild(h('span',{class:'pchip',text:n})); });
