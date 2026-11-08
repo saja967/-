@@ -3,13 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<style>body{margin:0}</style>
 <title>دجه</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
+<style>body{margin:0}
+
 /* Layout: right-to-left three-pane workspace. Departments (right) | task list grouped by priority (middle) | selected task workflow (left).
    Priority colors: red = urgent, amber = medium, green = not urgent. Brand teal is for actions. */
 :root{
@@ -177,561 +176,744 @@ button:hover{filter:brightness(1.08)}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
 .row .field{flex:1 1 140px}
 .sub-h{font-size:13px;font-weight:600;margin:14px 0 4px}
+
+.login{max-width:400px;margin:10vh auto 0}
+.login .brand{font-size:56px;margin-bottom:6px}
+.login form{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.err{color:var(--urgent);font-weight:600;font-size:14px;margin:0}
+.who{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.who span{font-size:14px;color:var(--muted)}
+a.btn-link{display:inline-block;text-decoration:none;font-weight:600;border-radius:8px;padding:8px 16px;border:1px solid var(--low);color:var(--low);font:inherit;font-weight:600;line-height:1.7}
+a.btn-link.off{border-color:var(--line);color:var(--muted);pointer-events:none}
+.toast{position:fixed;z-index:50;bottom:max(16px,env(safe-area-inset-bottom,0px));left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));margin:0 auto;max-width:460px;background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 16px;font-size:14px}
+.toast.bad{background:var(--urgent);color:#fff}
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+.tbl th{text-align:start;font-size:12px;color:var(--muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line)}
+.tbl td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl select{padding:4px 8px}
+.tbl .off{color:var(--muted)}
+.cred{background:var(--brand-bg);border:1px solid var(--brand);border-radius:8px;padding:12px;margin:12px 0}
+.cred p{margin:0 0 6px;overflow-wrap:anywhere}
+.cred code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--surface);padding:1px 8px;border-radius:6px;direction:ltr;unicode-bidi:embed}
+.top-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.top-actions button{padding:6px 14px;font-size:14px}
+.pending{color:var(--urgent);font-weight:600}
+
 </style>
-
-<div class="wrap" dir="rtl" lang="ar">
-  <div class="top">
-    <h1 class="brand">دجه<small>مهام الأقسام</small></h1>
-    <button type="button" class="b-main" id="new-btn">+ مهمة جديدة</button>
-  </div>
-
-  <div class="shell">
-    <nav class="card depts" id="depts" aria-label="الأقسام"></nav>
-
-    <section class="card" aria-labelledby="l-h">
-      <h2 id="l-h">المهام</h2>
-      <p class="dept-note" id="dept-note"></p>
-      <div class="filters" id="filters" role="group" aria-label="تصفية حسب الأولوية"></div>
-      <div id="list"></div>
-    </section>
-
-    <main class="detail" id="detail"></main>
-  </div>
-  <p class="note">الأقسام والأسماء والمهام أمثلة للتجربة. التغييرات تبقى في هذه الصفحة فقط ولا تُحفظ بعد إغلاقها.</p>
-</div>
-
+</head>
+<body>
+<div id="root"><div class="wrap"><p class="sub">جارٍ التحميل…</p></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 (function(){
-  var DEPTS = [
-    {id:'pr',name:'العلاقات العامة',members:['فهد','لمى'],note:'حجز مكان الجلسة والتواصل مع الجهة.'},
-    {id:'written',name:'المحتوى المكتوب',members:['نورة','ماجد'],note:''},
-    {id:'visual',name:'المحتوى المرئي',members:['سعد','هند'],note:''},
-    {id:'attendee',name:'تجربة الحضور',members:['ريم','تركي'],note:'المسؤول التشغيلي: فاطمة السريج · المسؤول المطور: اثير العيسي.'},
-    {id:'digital',name:'الهوية الرقمية',members:['بدر','جود'],note:''},
-    {id:'quality',name:'قياس الجودة',members:['عبدالله','منى'],note:''},
-    {id:'social',name:'السوشل ميديا',members:['خالد','دانة'],note:''}
-  ];
-  var PRIO = {
-    urgent:{label:'مستعجل',cls:'u',order:0},
-    mid:{label:'متوسط',cls:'m',order:1},
-    low:{label:'غير مستعجل',cls:'l',order:2}
-  };
-  var PHASES = ['الإسناد','الاستلام','التنفيذ','المراجعة','الإنهاء'];
-  var PILL = {assigned:'بانتظار الاستلام',inprogress:'قيد العمل',blocked:'متوقفة',review:'بانتظار المراجعة',done:'مكتملة'};
-  var CH = 'داخل التطبيق · الجوال · الإيميل';
+'use strict';
+var CFG = {
+  url:'https://wixtxuefonzfkxvqfxzr.supabase.co',
+  key:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpeHR4dWVmb256Zmt4dnFmeHpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxMjQyODgsImV4cCI6MjEwOTcwMDI4OH0.7yCQLmpkOHoKszEpv7vymHvMs3OZt8icmmWHzz2LicY'
+};
+var SITE = 'https://datchatalk.onrender.com';
+var sb = window.supabase.createClient(CFG.url, CFG.key, {auth:{persistSession:true,autoRefreshToken:true}});
 
-  function dept(id){ return DEPTS.filter(function(d){return d.id===id;})[0]; }
-  function isoPlus(days){
-    var d = new Date(); d.setDate(d.getDate()+days);
-    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+var PRIO = {urgent:{label:'مستعجل',cls:'u',order:0},mid:{label:'متوسط',cls:'m',order:1},low:{label:'غير مستعجل',cls:'l',order:2}};
+var PHASES = ['الإسناد','الاستلام','التنفيذ','المراجعة','الإنهاء'];
+var PILL = {assigned:'بانتظار الاستلام',inprogress:'قيد العمل',blocked:'متوقفة',review:'بانتظار المراجعة',done:'مكتملة'};
+var ROLE = {admin:'مسؤول النظام',head:'مسؤول قسم',member:'عضو'};
+var PH = ['نزلت بالتقويم','توزيع الأدوار','تجهيز المكان','يوم الجلسة','بعد الجلسة','منتهية'];
+var SETUP = ['ترتيب الكراسي','المايك','التكييف','الشكل العام للمكان','توزيع أماكن المشاركين حسب القسم','مراجعة الأدوار مع المشاركين'];
+var WRAP = ['الصورة الجماعية','تجميع الأغراض وترتيب المكان'];
+var KIND = {sponsor:'سبونسر أو علاقات عامة',complaint:'شكوى أو ملاحظة (المتابعة عند القسم الداخلي)',assign:'توزيع أو مشاركة جديدة',change:'تغيير (أُعلن في القروب العام)'};
+
+var root = document.getElementById('root');
+var me = null, depts = [], people = [], tasks = [], sessions = [], alerts = [];
+var page = 'work', deptFilter = 'mine', prioFilter = 'all', sel = null, creating = false, view = 'task', sessSel = null;
+var teamRows = [], cred = null, busy = false;
+
+/* ---------- helpers ---------- */
+function h(tag, props){
+  var el = document.createElement(tag);
+  props = props || {};
+  Object.keys(props).forEach(function(k){
+    var v = props[k];
+    if(k==='class') el.className = v;
+    else if(k==='text') el.textContent = v;
+    else if(k==='on') el.addEventListener('click', v);
+    else if(k==='change') el.addEventListener('change', v);
+    else el.setAttribute(k, v);
+  });
+  for(var i=2;i<arguments.length;i++){ if(arguments[i]) el.appendChild(arguments[i]); }
+  return el;
+}
+function uid(){ return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,10); }
+function isoPlus(days){ var d=new Date(); d.setDate(d.getDate()+days); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fmtDate(iso){ try{ return new Date(iso+'T00:00:00').toLocaleDateString('ar-SA-u-nu-latn',{day:'numeric',month:'long'}); }catch(e){ return iso; } }
+function fmtStamp(iso){ try{ return new Date(iso).toLocaleString('ar-SA-u-nu-latn',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } }
+function val(id){ var e=document.getElementById(id); return e ? String(e.value||'').trim() : ''; }
+function field(id,labelText,control,wide){ return h('div',{class:'field'+(wide?' wide':'')},h('label',{for:id,text:labelText}),control); }
+function btn(cls,text,fn){ return h('button',{type:'button',class:cls,on:fn,text:text}); }
+function opts(select,list,cur){ list.forEach(function(o){ var op=h('option',{value:o[0],text:o[1]}); if(o[0]===cur) op.selected=true; select.appendChild(op); }); return select; }
+function waPhone(p){ var d=String(p||'').replace(/\D/g,''); if(d.indexOf('00')===0) d=d.slice(2); if(d.length===10 && d.charAt(0)==='0') d='966'+d.slice(1); else if(d.length===9 && d.charAt(0)==='5') d='966'+d; return d; }
+function waLink(p,text){ var n=waPhone(p); return n ? 'https://wa.me/'+n+'?text='+encodeURIComponent(text) : ''; }
+function deptName(id){ var d=depts.filter(function(x){return x.id===id;})[0]; return d ? d.name : (id||'');}
+function dept(id){ return depts.filter(function(x){return x.id===id;})[0]; }
+function person(id){ return people.filter(function(x){return x.id===id;})[0]; }
+function headOf(deptId){ return people.filter(function(p){return p.role==='head' && p.dept_id===deptId && p.active;})[0]; }
+function toast(msg,kind){
+  var old=document.getElementById('toast'); if(old) old.remove();
+  var t=h('div',{id:'toast',class:'toast'+(kind==='bad'?' bad':''),role:'status','aria-live':'polite',text:msg});
+  document.body.appendChild(t);
+  setTimeout(function(){ if(t.parentNode) t.remove(); }, kind==='bad'?7000:3500);
+}
+function errText(e){ return (e && e.message) ? e.message : String(e||''); }
+
+async function fn(name, body){
+  var r = await sb.functions.invoke(name, {body:body});
+  if(r.error){
+    var m = r.error.message;
+    try{ if(r.error.context && r.error.context.json){ var j = await r.error.context.json(); if(j && j.error) m = j.error; } }catch(e){}
+    throw new Error(m);
   }
-  function fmtDate(iso){
-    try { return new Date(iso+'T00:00:00').toLocaleDateString('ar-SA-u-nu-latn',{day:'numeric',month:'long'}); }
-    catch(e){ return iso; }
+  if(r.data && r.data.error) throw new Error(r.data.error);
+  return r.data;
+}
+
+/* ---------- login / password ---------- */
+function brandBlock(){ return h('h1',{class:'brand',text:'دجه'}); }
+function renderLogin(msg){
+  me = null;
+  var email = h('input',{id:'l-email',type:'email',autocomplete:'username',inputmode:'email',dir:'ltr',required:'required'});
+  var pass = h('input',{id:'l-pass',type:'password',autocomplete:'current-password',dir:'ltr',required:'required'});
+  var err = h('p',{class:'err',id:'l-err',role:'alert',text:msg||''});
+  var form = h('form',{},
+    field('l-email','الإيميل',email), field('l-pass','كلمة السر',pass), err,
+    h('button',{type:'submit',class:'b-main',text:'دخول'}),
+    h('p',{class:'hint',text:'نسيت كلمة السر؟ كلّم مسؤول النظام وهو يعطيك كلمة جديدة.'}));
+  form.addEventListener('submit', async function(ev){
+    ev.preventDefault();
+    err.textContent='';
+    var r = await sb.auth.signInWithPassword({email:email.value.trim().toLowerCase(),password:pass.value});
+    if(r.error){ err.textContent = 'الإيميل أو كلمة السر غير صحيحة.'; return; }
+    await afterLogin();
+  });
+  var card = h('section',{class:'card login'},brandBlock(),h('p',{class:'sub',text:'سجّل دخولك لتشوف مهام قسمك.'}),form);
+  root.replaceChildren(h('div',{class:'wrap',dir:'rtl',lang:'ar'},card));
+}
+function renderChangePassword(first){
+  var p1 = h('input',{id:'p-new',type:'password',autocomplete:'new-password',dir:'ltr',minlength:'8'});
+  var p2 = h('input',{id:'p-new2',type:'password',autocomplete:'new-password',dir:'ltr',minlength:'8'});
+  var err = h('p',{class:'err',role:'alert'});
+  var form = h('form',{},field('p-new','كلمة السر الجديدة (8 أحرف أو أكثر)',p1),field('p-new2','أعد كتابتها',p2),err,
+    h('button',{type:'submit',class:'b-main',text:'حفظ'}));
+  if(!first) form.appendChild(btn('b-ghost','إلغاء',function(){ render(); }));
+  form.addEventListener('submit', async function(ev){
+    ev.preventDefault(); err.textContent='';
+    if(p1.value.length<8){ err.textContent='كلمة السر أقصر من 8 أحرف.'; return; }
+    if(p1.value!==p2.value){ err.textContent='الكلمتان غير متطابقتين.'; return; }
+    var r = await sb.auth.updateUser({password:p1.value});
+    if(r.error){ err.textContent='تعذر تغيير كلمة السر: '+r.error.message; return; }
+    await sb.rpc('finish_password_change');
+    me.must_change = false;
+    toast('تم تغيير كلمة السر');
+    if(first) await startApp(); else render();
+  });
+  var card = h('section',{class:'card login'},brandBlock(),
+    h('p',{class:'sub',text: first ? 'هذا أول دخول لك. غيّر كلمة السر المؤقتة قبل ما تكمل.' : 'تغيير كلمة السر'}),form);
+  root.replaceChildren(h('div',{class:'wrap',dir:'rtl',lang:'ar'},card));
+}
+async function afterLogin(){
+  var s = await sb.auth.getSession();
+  var id = s.data && s.data.session ? s.data.session.user.id : null;
+  if(!id){ renderLogin(); return; }
+  var r = await sb.from('profiles').select('*').eq('id',id).maybeSingle();
+  if(r.error || !r.data || !r.data.active){
+    await sb.auth.signOut(); renderLogin('حسابك غير مفعّل. كلّم مسؤول النظام.'); return;
   }
-  function h(tag, props){
-    var el = document.createElement(tag);
-    props = props || {};
-    Object.keys(props).forEach(function(k){
-      if(k==='class') el.className = props[k];
-      else if(k==='text') el.textContent = props[k];
-      else if(k==='on') el.addEventListener('click', props[k]);
-      else if(k==='change') el.addEventListener('change', props[k]);
-      else el.setAttribute(k, props[k]);
+  me = r.data;
+  if(me.must_change){ renderChangePassword(true); return; }
+  await startApp();
+}
+async function logout(){ await sb.auth.signOut(); renderLogin(); }
+
+/* ---------- data ---------- */
+function rowToTask(r){
+  var d = r.data || {};
+  return {id:r.id,_p:true,title:d.title||'',desc:d.desc||'',prio:d.prio||'mid',due:d.due||isoPlus(7),route:d.route||[r.dept_id],idx:d.idx||0,phase:d.phase||'assigned',
+    blockReason:d.blockReason||'',blockWho:d.blockWho||'',feed:d.feed||[],assigneeId:r.assignee_id,assignee:d.assignee||'',createdBy:r.created_by,createdByName:d.createdByName||'',link:d.link||'',reviewerId:d.reviewerId||null,reviewer:d.reviewer||''};
+}
+function taskData(t){ return {title:t.title,desc:t.desc,prio:t.prio,due:t.due,route:t.route,idx:t.idx,phase:t.phase,blockReason:t.blockReason,blockWho:t.blockWho,feed:t.feed.slice(0,80),assignee:t.assignee,createdByName:t.createdByName,link:t.link,reviewerId:t.reviewerId,reviewer:t.reviewer}; }
+function rowToSession(r){
+  var d = r.data || {};
+  return {id:r.id,_p:true,title:d.title||'',time:d.time||'',date:d.date||isoPlus(7),venue:d.venue||'',registered:d.registered||0,chairs:d.chairs||0,needed:d.needed||0,
+    team:d.team||[],vol:d.vol||[],phase:d.phase||0,checkedIn:d.checkedIn||0,setup:d.setup||SETUP.map(function(){return false;}),wrap:d.wrap||WRAP.map(function(){return false;})};
+}
+function sessionData(x){ return {title:x.title,time:x.time,date:x.date,venue:x.venue,registered:x.registered,chairs:x.chairs,needed:x.needed,team:x.team,vol:x.vol,phase:x.phase,checkedIn:x.checkedIn,setup:x.setup,wrap:x.wrap}; }
+function rowToAlert(r){ var d=r.data||{}; return {id:r.id,sid:d.sid,kind:d.kind||'change',text:d.text||'',read:!!d.read,at:r.created_at}; }
+
+async function loadAll(){
+  var q = await Promise.all([
+    sb.from('departments').select('*').order('sort'),
+    sb.from('profiles').select('*').eq('active',true).order('full_name'),
+    sb.from('tasks').select('*').order('created_at',{ascending:false}),
+    sb.from('event_sessions').select('*'),
+    sb.from('alerts').select('*').order('created_at',{ascending:false})
+  ]);
+  var bad = q.filter(function(x){return x.error;})[0];
+  if(bad) toast('تعذر تحميل بعض البيانات: '+bad.error.message,'bad');
+  depts = q[0].data || []; people = q[1].data || [];
+  tasks = (q[2].data||[]).map(rowToTask);
+  sessions = (q[3].data||[]).map(rowToSession);
+  alerts = (q[4].data||[]).map(rowToAlert);
+  if(!sessions.some(function(x){return x.id===sessSel;})) sessSel = sessions.length ? sessions[0].id : null;
+  if(!tasks.some(function(t){return t.id===sel;})) sel = null;
+}
+async function saveTask(t){
+  var row = {dept_id:curDept(t),assignee_id:t.assigneeId||null,data:taskData(t)};
+  var r;
+  if(t._p){ r = await sb.from('tasks').update(row).eq('id',t.id); }
+  else { row.id=t.id; row.created_by=me.id; r = await sb.from('tasks').insert(row); if(!r.error){ t._p=true; t.createdBy=me.id; } }
+  if(r.error){ toast('تعذر حفظ التغيير: '+r.error.message,'bad'); await loadAll(); render(); }
+}
+async function saveSession(x){
+  var r;
+  if(x._p){ r = await sb.from('event_sessions').update({data:sessionData(x)}).eq('id',x.id); }
+  else { r = await sb.from('event_sessions').insert({id:x.id,dept_id:'attendee',data:sessionData(x),created_by:me.id}); if(!r.error) x._p=true; }
+  if(r.error){ toast('تعذر حفظ الجلسة: '+r.error.message,'bad'); await loadAll(); render(); }
+}
+async function addAlert(sid,kind,text){
+  var a = {id:uid(),sid:sid,kind:kind,text:text,read:false,at:new Date().toISOString()};
+  alerts.unshift(a);
+  var r = await sb.from('alerts').insert({id:a.id,dept_id:'attendee',data:{sid:sid,kind:kind,text:text,read:false}});
+  if(r.error) toast('تعذر حفظ التنبيه: '+r.error.message,'bad');
+}
+async function markRead(a){
+  a.read = true;
+  var r = await sb.from('alerts').update({data:{sid:a.sid,kind:a.kind,text:a.text,read:true}}).eq('id',a.id);
+  if(r.error) toast('تعذر حفظ التغيير: '+r.error.message,'bad');
+}
+
+/* ---------- roles ---------- */
+function isAdmin(){ return me.role==='admin'; }
+function canCreate(){ return me.role==='admin' || me.role==='head'; }
+function curDept(t){ return t.route[t.idx]; }
+function isAssignee(t){ return t.assigneeId===me.id; }
+function canWork(t){ return isAssignee(t) || isAdmin(); }
+function isOwner(t){ return t.createdBy===me.id || t.reviewerId===me.id || isAdmin() || (me.role==='head' && me.dept_id===curDept(t)); }
+function seesAttendee(){ return isAdmin() || me.dept_id==='attendee'; }
+
+/* ---------- task transitions ---------- */
+function log(t,text){ t.feed.unshift({by:me.full_name,text:text,at:new Date().toISOString()}); }
+var T = {
+  receive:function(t){ t.phase='inprogress'; log(t,'استلم المهمة وبدأ العمل'); },
+  update:function(t){ var c=val('f-comment'); log(t, c ? 'حدّث التقدم: '+c : 'حدّث تقدم المهمة'); },
+  block:function(t){ t.blockReason=val('f-reason')||'بدون سبب مكتوب'; t.blockWho=val('f-who'); t.phase='blocked'; log(t,'غيّر الحالة إلى متوقفة. السبب: '+t.blockReason+(t.blockWho?' · بانتظار '+t.blockWho:'')); },
+  resolve:function(t){ t.phase='inprogress'; t.blockReason=''; t.blockWho=''; log(t,'حلّ العائق وأرجع المهمة قيد العمل'); },
+  deliver:function(t){ var l=val('f-link'); var ok=/^https?:\/\//i.test(l); if(ok) t.link=l; t.phase='review'; log(t,'سلّم الشغل وهو بانتظار المراجعة'+(ok?' مع رابط المواد':'')); },
+  approve:function(t){
+    log(t,'اعتمد الشغل');
+    if(t.idx+1 < t.route.length){
+      t.idx++; t.phase='assigned';
+      var nh = headOf(curDept(t));
+      t.assigneeId = nh ? nh.id : null; t.assignee = nh ? nh.full_name : '';
+      log(t,'انتقلت المهمة إلى قسم '+deptName(curDept(t))+(nh?' (المسؤول: '+nh.full_name+')':' ولا يوجد له مسؤول بعد'));
+    } else { t.phase='done'; log(t,'أُنهيت المهمة'); }
+  },
+  edit:function(t){ var n=val('f-notes')||'بدون ملاحظات مكتوبة'; t.phase='inprogress'; log(t,'طلب تعديلًا: '+n); }
+};
+function go(name){ return function(){
+  var t = tasks.filter(function(x){return x.id===sel;})[0]; if(!t) return;
+  T[name](t); render();
+  saveTask(t).then(function(){ if(name==='approve'){ loadAll().then(render); } });
+}; }
+
+/* ---------- reminders ---------- */
+function reminderTarget(t){
+  if(t.phase==='review'){ var c = person(t.reviewerId||t.createdBy); return (c && c.id!==me.id) ? c : null; }
+  return t.assigneeId ? person(t.assigneeId) : null;
+}
+function reminderText(t,p){
+  return 'السلام عليكم '+p.full_name+'،\nتذكير بمهمة «'+t.title+'» ('+PRIO[t.prio].label+') — موعد التسليم '+fmtDate(t.due)+'.\nافتح دجه: '+SITE;
+}
+function reminderBox(t){
+  var p = reminderTarget(t);
+  var box = h('div',{});
+  box.appendChild(h('p',{class:'sub-h',text:'تذكير'}));
+  if(!p){ box.appendChild(h('p',{class:'hint',text:'ما فيه شخص محدد أذكّره حاليًا.'})); return box; }
+  var text = reminderText(t,p);
+  var row = h('div',{class:'btns'});
+  var link = waLink(p.phone,text);
+  if(link){
+    var a = h('a',{class:'btn-link',href:link,target:'_blank',rel:'noopener',text:'ذكّر '+p.full_name+' بالواتساب'});
+    a.addEventListener('click',function(){ log(t,'ذكّر '+p.full_name+' بالواتساب'); saveTask(t); });
+    row.appendChild(a);
+  } else row.appendChild(h('a',{class:'btn-link off',text:'ما فيه رقم جوال لـ '+p.full_name}));
+  row.appendChild(btn('b-ghost','ذكّره بالإيميل',async function(ev){
+    var b = ev.currentTarget; b.disabled = true;
+    try{ await fn('send-email',{to_profile_id:p.id,subject:'تذكير بمهمة: '+t.title,text:text}); toast('أُرسل التذكير على إيميل '+p.full_name); log(t,'ذكّر '+p.full_name+' بالإيميل'); saveTask(t); render(); }
+    catch(e){ toast(errText(e),'bad'); b.disabled=false; }
+  }));
+  box.appendChild(row);
+  return box;
+}
+
+/* ---------- panes ---------- */
+function visibleTasks(){
+  return tasks.filter(function(t){
+    var okD = deptFilter==='all' || (deptFilter==='mine' ? (t.assigneeId===me.id || t.createdBy===me.id) : curDept(t)===deptFilter);
+    return okD && (prioFilter==='all' || t.prio===prioFilter);
+  });
+}
+function ensureSel(){ var v=visibleTasks(); if(!v.some(function(t){return t.id===sel;})) sel = v.length ? v[0].id : null; }
+function deptItems(){
+  var items = [['mine','مهامي']];
+  if(isAdmin()){ items.push(['all','كل الأقسام']); depts.forEach(function(d){ items.push([d.id,d.name]); }); }
+  else if(me.dept_id) items.push([me.dept_id,deptName(me.dept_id)]);
+  return items;
+}
+function openCount(id){
+  return tasks.filter(function(t){ return t.phase!=='done' && (id==='all' || (id==='mine' ? (t.assigneeId===me.id||t.createdBy===me.id) : curDept(t)===id)); });
+}
+function renderDepts(nav){
+  nav.appendChild(h('p',{class:'label',text:'الأقسام'}));
+  deptItems().forEach(function(it){
+    var open = openCount(it[0]);
+    var urg = open.filter(function(t){return t.prio==='urgent';}).length;
+    var nums = h('span',{class:'nums'});
+    if(urg) nums.appendChild(h('span',{class:'count u',text:String(urg),title:'مستعجل'}));
+    nums.appendChild(h('span',{class:'count',text:String(open.length),title:'مفتوحة'}));
+    var b = h('button',{type:'button',class:'dept'+(deptFilter===it[0]?' on':''),on:function(){
+      deptFilter=it[0]; creating=false; if(it[0]==='attendee' && seesAttendee()) view='sessions'; else view='task'; ensureSel(); render(); }},h('span',{text:it[1]}),nums);
+    nav.appendChild(b);
+  });
+}
+function renderList(sec){
+  sec.appendChild(h('h2',{text:'المهام'}));
+  var d = (deptFilter==='all'||deptFilter==='mine') ? null : dept(deptFilter);
+  sec.appendChild(h('p',{class:'dept-note',text: d ? (d.note ? d.name+': '+d.note : d.name) : (deptFilter==='mine' ? 'المهام المسندة لك أو اللي أنت أسندتها.' : 'كل مهام الأقسام مرتبة حسب الأولوية.')}));
+  var fl = h('div',{class:'filters',role:'group','aria-label':'تصفية حسب الأولوية'});
+  [['all','الكل']].concat(Object.keys(PRIO).map(function(k){return [k,PRIO[k].label];})).forEach(function(p){
+    var n = tasks.filter(function(t){
+      var okD = deptFilter==='all' || (deptFilter==='mine' ? (t.assigneeId===me.id||t.createdBy===me.id) : curDept(t)===deptFilter);
+      return okD && (p[0]==='all'||t.prio===p[0]); }).length;
+    fl.appendChild(h('button',{type:'button',class:'f'+(prioFilter===p[0]?' on':''),on:function(){ prioFilter=p[0]; ensureSel(); render(); },text:p[1]+' '+n}));
+  });
+  sec.appendChild(fl);
+  var v = visibleTasks();
+  if(!v.length){ sec.appendChild(h('p',{class:'empty',text:'ما فيه مهام هنا.'+(canCreate()?' اضغط «مهمة جديدة» لتسند أول مهمة.':'')})); return; }
+  Object.keys(PRIO).sort(function(a,b){return PRIO[a].order-PRIO[b].order;}).forEach(function(k){
+    var g = v.filter(function(t){return t.prio===k;}).sort(function(a,b){ return (a.phase==='done')-(b.phase==='done') || a.due.localeCompare(b.due); });
+    if(!g.length) return;
+    var wrap = h('div',{class:'group'});
+    wrap.appendChild(h('p',{class:'gh'},h('span',{class:'sw '+PRIO[k].cls+'-bg'}),h('span',{text:PRIO[k].label+' ('+g.length+')'})));
+    var ul = h('ul',{class:'tl'});
+    g.forEach(function(t){
+      var meta = h('span',{class:'t-meta'},h('span',{text:deptName(curDept(t))+' · '+(t.assignee||'بدون مسؤول')}),h('span',{text:PILL[t.phase]}),h('span',{text:fmtDate(t.due)}));
+      if(t.phase==='assigned' && isAssignee(t)) meta.appendChild(h('span',{class:'pending',text:'بانتظار استلامك'}));
+      if(t.phase!=='done'){ var dl=daysLeft({date:t.due}); if(dl<=2) meta.appendChild(h('span',{class:'pending',text: dl<0?'متأخرة':dl===0?'التسليم اليوم':'باقي '+(dl===1?'يوم':'يومين')})); }
+      var b = h('button',{type:'button',class:'t '+PRIO[k].cls+(t.id===sel?' sel':''),on:function(){ sel=t.id; creating=false; view='task'; render(); }},
+        h('span',{class:'bar '+PRIO[k].cls+'-bg'}),h('span',{class:'body'},h('span',{class:'t-title',text:t.title}),meta));
+      ul.appendChild(h('li',{},b));
     });
-    for(var i=2;i<arguments.length;i++){ if(arguments[i]) el.appendChild(arguments[i]); }
-    return el;
-  }
-  function val(id){ var e=document.getElementById(id); return e ? e.value.trim() : ''; }
+    wrap.appendChild(ul); sec.appendChild(wrap);
+  });
+}
 
-  /* ---------- data ---------- */
-  var nextId = 1;
-  var tasks = [];
-  var sel = null, deptFilter = 'all', prioFilter = 'all', creating = false;
-
-  function curDept(t){ return t.route[t.idx]; }
-  function pickMember(deptId, salt){ var m = dept(deptId).members; return m[salt % m.length]; }
-  function mk(o){
-    var t = {id:nextId++,title:o.title,prio:o.prio,due:isoPlus(o.days),route:o.route,idx:o.idx||0,phase:o.phase,
-      hours:0,blockReason:o.blockReason||'',blockWho:o.blockWho||'',feed:[]};
-    t.assignee = pickMember(curDept(t), t.id);
-    (o.feed||[]).forEach(function(f){ t.feed.push({kind:f[0],to:f[1],text:f[2],ch:f[3]||'',t:f[4]||0}); });
-    tasks.push(t);
-    return t;
-  }
-  function seed(){
-    mk({title:'حجز مكان الجلسة والتواصل مع الجهة المستضيفة',prio:'urgent',days:2,route:['pr'],phase:'assigned',
-      feed:[['notify','العضو (فهد)','رئيس القسم أسند لك مهمة جديدة: «حجز مكان الجلسة والتواصل مع الجهة المستضيفة».',CH,0]]});
-    mk({title:'كتابة نص إعلان الجلسة',prio:'mid',days:4,route:['written','visual','social','quality'],phase:'inprogress',
-      feed:[['activity','رئيس القسم','نشر المهمة وأسندها',' ',0],['activity','العضو','ضغط «استلمت المهمة»','',1]]});
-    mk({title:'تصميم بوستر الجلسة',prio:'urgent',days:3,route:['visual','social','quality'],phase:'blocked',
-      blockReason:'أنتظر النص النهائي من كتابة المحتوى',blockWho:'@نورة',
-      feed:[['activity','العضو','غيّر الحالة إلى متوقفة. السبب: أنتظر النص النهائي من كتابة المحتوى','',30]]});
-    mk({title:'جدولة منشورات الأسبوع',prio:'low',days:6,route:['social','quality'],phase:'review',
-      feed:[['notify','رئيس القسم','مهمة «جدولة منشورات الأسبوع» بانتظار مراجعتك.',CH,52]]});
-    mk({title:'مراجعة مواد الجلسة قبل النشر',prio:'mid',days:5,route:['quality'],phase:'assigned'});
-    mk({title:'مقال المدونة الشهري',prio:'low',days:9,route:['written','quality'],phase:'inprogress'});
-    mk({title:'تحديث قالب العروض التقديمية',prio:'mid',days:-1,route:['visual'],phase:'done',
-      feed:[['notify','كل المشاركين','انتهت المهمة «تحديث قالب العروض التقديمية».',CH,60]]});
-    mk({title:'تجهيز مسار استقبال الحضور وتسجيل الدخول',prio:'mid',days:4,route:['attendee','quality'],phase:'inprogress'});
-    mk({title:'تحديث ألوان الهوية على صفحة التسجيل',prio:'low',days:8,route:['digital','quality'],phase:'assigned'});
-    sel = 1;
-  }
-  seed();
-
-  function get(id){ return tasks.filter(function(t){return t.id===id;})[0]; }
-  function log(t,kind,to,text,ch){ t.feed.unshift({kind:kind,to:to,text:text,ch:ch||'',t:t.hours}); }
-  function who(t){ return 'العضو ('+t.assignee+')'; }
-
-  /* ---------- transitions ---------- */
-  var T = {
-    receive:function(t){ t.phase='inprogress';
-      log(t,'activity',who(t),'ضغط «استلمت المهمة»');
-      log(t,'notify','رئيس القسم',t.assignee+' استلم المهمة وتغيّرت حالتها إلى قيد العمل.',CH); },
-    noReceive:function(t){ t.hours+=24;
-      log(t,'notify',who(t),'تذكير: المهمة «'+t.title+'» ما زالت بانتظار استلامك.',CH);
-      log(t,'notify','رئيس القسم','مرّت 24 ساعة ولم يستلم '+t.assignee+' المهمة.',CH); },
-    update:function(t){ var c=val('f-comment');
-      log(t,'activity',who(t), c ? 'حدّث التقدم: '+c : 'حدّث تقدم المهمة'); },
-    stale:function(t){ t.hours+=48;
-      log(t,'notify',who(t),'ما فيه أي تحديث على «'+t.title+'» منذ يومين.',CH);
-      log(t,'notify','رئيس القسم','ما فيه أي تحديث من '+t.assignee+' منذ يومين.',CH); },
-    block:function(t){
-      t.blockReason = val('f-reason') || 'بدون سبب مكتوب'; t.blockWho = val('f-who'); t.phase='blocked';
-      log(t,'activity',who(t),'غيّر الحالة إلى متوقفة. السبب: '+t.blockReason);
-      log(t,'notify','المسؤول عن العائق'+(t.blockWho?' ('+t.blockWho+')':''),t.assignee+' ينتظر منك حلًّا لعائق: '+t.blockReason,CH);
-      log(t,'notify','رئيس القسم','المهمة «'+t.title+'» متوقفة بسبب عائق.',CH); },
-    resolve:function(t){ t.phase='inprogress'; t.blockReason=''; t.blockWho='';
-      log(t,'activity','رئيس القسم','حلّ العائق وأرجع المهمة قيد العمل');
-      log(t,'notify',who(t),'انحل العائق ورجعت المهمة قيد العمل.',CH); },
-    deliver:function(t){ t.phase='review';
-      log(t,'activity',who(t),'رفع الشغل وضغط «تم التسليم»');
-      log(t,'notify','رئيس القسم','مهمة «'+t.title+'» بانتظار مراجعتك.',CH); },
-    approve:function(t){
-      log(t,'activity','رئيس القسم','اعتمد الشغل');
-      if(t.idx+1 < t.route.length){
-        t.idx++; t.phase='assigned'; t.assignee = pickMember(curDept(t), t.id+t.idx);
-        log(t,'notify','النظام','فيه مرحلة تالية: المهمة تنتقل تلقائيًا إلى قسم '+dept(curDept(t)).name+'.','');
-        log(t,'notify',who(t),'انتقلت لك المهمة «'+t.title+'». موعد التسليم '+fmtDate(t.due)+'.',CH);
-      } else {
-        t.phase='done';
-        log(t,'notify','كل المشاركين','انتهت المهمة «'+t.title+'».',CH);
-      } },
-    edit:function(t){ var n = val('f-notes') || 'بدون ملاحظات مكتوبة'; t.phase='inprogress';
-      log(t,'activity','رئيس القسم','كتب ملاحظات وطلب تعديل: '+n);
-      log(t,'notify',who(t),'رئيس القسم طلب تعديلًا على «'+t.title+'»: '+n,CH); }
-  };
-  function go(name){ return function(){ var t=get(sel); if(t){ T[name](t); render(); } }; }
-
-  /* ---------- left/right panes ---------- */
-  function visible(){
-    return tasks.filter(function(t){
-      var okD = deptFilter==='all' || curDept(t)===deptFilter;
-      var okP = prioFilter==='all' || t.prio===prioFilter;
-      return okD && okP;
-    });
-  }
-  function renderDepts(){
-    var nav = document.getElementById('depts'); nav.textContent = '';
-    nav.appendChild(h('p',{class:'label',text:'الأقسام'}));
-    function item(id,name){
-      var open = tasks.filter(function(t){ return t.phase!=='done' && (id==='all' || curDept(t)===id); });
-      var urg = open.filter(function(t){ return t.prio==='urgent'; }).length;
-      var nums = h('span',{class:'nums'});
-      if(urg) nums.appendChild(h('span',{class:'count u',text:String(urg),title:'مستعجل'}));
-      nums.appendChild(h('span',{class:'count',text:String(open.length),title:'مفتوحة'}));
-      var b = h('button',{type:'button',class:'dept'+(deptFilter===id?' on':''),on:function(){
-        deptFilter=id; creating=false; if(id==='attendee') view='sessions'; ensureSel(); render(); }},h('span',{text:name}),nums);
-      if(deptFilter===id) b.setAttribute('aria-current','true');
-      nav.appendChild(b);
-    }
-    item('all','كل الأقسام');
-    DEPTS.forEach(function(d){ item(d.id,d.name); });
-  }
-  function ensureSel(){
-    var v = visible();
-    if(!v.some(function(t){return t.id===sel;})) sel = v.length ? v[0].id : null;
-  }
-  function renderList(){
-    var d = deptFilter==='all' ? null : dept(deptFilter);
-    document.getElementById('dept-note').textContent = d ? (d.note ? d.name+': '+d.note : d.name) : 'كل مهام الأقسام مرتبة حسب الأولوية.';
-    var fl = document.getElementById('filters'); fl.textContent = '';
-    [['all','الكل']].concat(Object.keys(PRIO).map(function(k){ return [k,PRIO[k].label]; })).forEach(function(p){
-      var n = tasks.filter(function(t){ return (deptFilter==='all'||curDept(t)===deptFilter) && (p[0]==='all'||t.prio===p[0]); }).length;
-      var b = h('button',{type:'button',class:'f'+(prioFilter===p[0]?' on':''),on:function(){ prioFilter=p[0]; ensureSel(); render(); },text:p[1]+' '+n});
-      fl.appendChild(b);
-    });
-    var root = document.getElementById('list'); root.textContent = '';
-    var v = visible();
-    if(!v.length){ root.appendChild(h('p',{class:'empty',text:'ما فيه مهام بهذا الفلتر.'})); return; }
-    Object.keys(PRIO).sort(function(a,b){return PRIO[a].order-PRIO[b].order;}).forEach(function(k){
-      var g = v.filter(function(t){return t.prio===k;}).sort(function(a,b){ return (a.phase==='done')-(b.phase==='done') || a.due.localeCompare(b.due); });
-      if(!g.length) return;
-      var wrap = h('div',{class:'group'});
-      wrap.appendChild(h('p',{class:'gh'},h('span',{class:'sw '+PRIO[k].cls+'-bg'}),h('span',{text:PRIO[k].label+' ('+g.length+')'})));
-      var ul = h('ul',{class:'tl'});
-      g.forEach(function(t){
-        var bar = h('span',{class:'bar '+PRIO[k].cls+'-bg'});
-        var body = h('span',{class:'body'},
-          h('span',{class:'t-title',text:t.title}),
-          h('span',{class:'t-meta'},h('span',{text:dept(curDept(t)).name+' · '+t.assignee}),h('span',{text:PILL[t.phase]}),h('span',{text:fmtDate(t.due)})));
-        var b = h('button',{type:'button',class:'t '+PRIO[k].cls+(t.id===sel?' sel':''),on:function(){ sel=t.id; creating=false; view='task'; render(); }},bar,body);
-        ul.appendChild(h('li',{},b));
-      });
-      wrap.appendChild(ul); root.appendChild(wrap);
-    });
-  }
-
-  /* ---------- detail ---------- */
-  function field(id,labelText,control,wide){
-    return h('div',{class:'field'+(wide?' wide':'')},h('label',{for:id,text:labelText}),control);
-  }
-  function btn(cls,text,fn){ return h('button',{type:'button',class:cls,on:fn,text:text}); }
-  function opts(sel,list,cur){ list.forEach(function(o){ var op=h('option',{value:o[0],text:o[1]}); if(o[0]===cur) op.selected=true; sel.appendChild(op); }); return sel; }
-
-  function renderCreate(root){
-    var card = h('section',{class:'card'},h('h2',{text:'مهمة جديدة'}));
-    var first = DEPTS[0].id;
-    var deptSel = opts(h('select',{id:'n-dept',change:function(){
-      var asg = document.getElementById('n-asg'); asg.textContent='';
-      opts(asg, dept(deptSel.value).members.map(function(m){return [m,m];}), '');
-    }}), DEPTS.map(function(d){return [d.id,d.name];}), first);
-    var asg = opts(h('select',{id:'n-asg'}), dept(first).members.map(function(m){return [m,m];}), '');
-    var prio = opts(h('select',{id:'n-prio'}), Object.keys(PRIO).map(function(k){return [k,PRIO[k].label];}), 'mid');
-    var nextSel = opts(h('select',{id:'n-next'}), [['','بدون']].concat(DEPTS.map(function(d){return [d.id,d.name];})), '');
-    card.appendChild(h('div',{class:'fields'},
-      field('n-title','عنوان المهمة',h('input',{id:'n-title',type:'text',placeholder:'مثال: تجهيز تقرير الجلسة'}),true),
-      field('n-dept','القسم',deptSel),
-      field('n-asg','المسند إليه',asg),
-      field('n-prio','الأولوية',prio),
-      field('n-due','موعد التسليم',h('input',{id:'n-due',type:'date',value:isoPlus(5)})),
-      field('n-next','المرحلة التالية بعد الاعتماد',nextSel)));
-    card.appendChild(h('div',{class:'btns'},
-      btn('b-main','انشر المهمة وأسندها',function(){
-        var title = val('n-title'); if(!title){ document.getElementById('n-title').focus(); return; }
-        var d = val('n-dept'), nx = val('n-next');
-        var route = [d]; if(nx && nx!==d) route.push(nx);
-        var t = mk({title:title,prio:val('n-prio'),days:0,route:route,phase:'assigned'});
-        t.due = val('n-due') || isoPlus(5); t.assignee = val('n-asg') || t.assignee;
-        log(t,'activity','رئيس القسم','نشر المهمة وأسندها إلى @'+t.assignee);
-        log(t,'notify',who(t),'رئيس القسم أسند لك مهمة جديدة: «'+t.title+'». موعد التسليم '+fmtDate(t.due)+'.',CH);
-        sel = t.id; creating = false; deptFilter='all'; prioFilter='all'; render();
-      }),
-      btn('b-ghost','إلغاء',function(){ creating=false; render(); })));
-    root.appendChild(card);
-  }
-
-  function renderTask(root,t){
-    var cur = {assigned:1,inprogress:2,blocked:2,review:3,done:4}[t.phase];
-    var head = h('section',{class:'card'});
-    var badges = h('div',{class:'badges'},
-      h('span',{class:'pill '+t.prio,text:PRIO[t.prio].label}),
-      h('span',{class:'pill st '+t.phase,text:PILL[t.phase]}));
-    head.appendChild(h('div',{class:'d-top'},h('h2',{class:'d-title',text:t.title}),badges));
-    var route = h('ol',{class:'route','aria-label':'مسار المهمة بين الأقسام'});
-    t.route.forEach(function(id,i){
-      if(i) route.appendChild(h('li',{class:'ar','aria-hidden':'true',text:'←'}));
-      var c = i===t.idx ? (t.phase==='done'?'past':'cur') : (i<t.idx?'past':'');
-      route.appendChild(h('li',{class:c,text:dept(id).name}));
-    });
-    head.appendChild(route);
-    var meta = h('dl',{class:'meta'});
-    function row(k,v){ meta.appendChild(h('div',{},h('dt',{text:k}),h('dd',{text:v}))); }
-    row('القسم الحالي', dept(curDept(t)).name);
-    row('المسؤول', t.assignee);
-    row('موعد التسليم', fmtDate(t.due));
-    row('المرحلة', (t.idx+1)+' من '+t.route.length);
-    head.appendChild(meta);
-    if(t.phase==='blocked') head.appendChild(h('div',{class:'blocknote',text:'العائق: '+t.blockReason+(t.blockWho?' · بانتظار '+t.blockWho:'')}));
-    root.appendChild(head);
-
-    var steps = h('ol',{class:'steps','aria-label':'مراحل المهمة'});
-    PHASES.forEach(function(name,i){
-      var c = '';
-      if(t.phase==='done' || i<cur) c = 'done'; else if(i===cur) c = t.phase==='blocked' ? 'current blocked' : 'current';
-      var li = h('li',{class:c},h('span',{class:'dot',text:c==='done'?'✓':String(i+1)}),h('span',{text:name}));
-      if(i===cur && t.phase!=='done') li.setAttribute('aria-current','step');
-      steps.appendChild(li);
-    });
-    root.appendChild(h('section',{class:'card'},steps));
-
-    var two = h('div',{class:'two'});
-    two.appendChild(renderAction(t));
-    var fc = h('section',{class:'card'},h('h2',{text:'الإشعارات والنشاط'}));
-    var ul = h('ul',{class:'feed'});
-    if(!t.feed.length) ul.appendChild(h('li',{},h('p',{class:'empty',text:'ما فيه نشاط بعد على هذه المهمة.'})));
-    t.feed.forEach(function(f){
-      var li = h('li',{class:'item '+f.kind},
-        h('div',{class:'item-top'},h('span',{text:f.kind==='notify'?'إشعار إلى '+f.to:f.to}),h('span',{text:'الساعة '+f.t})),
-        h('p',{class:'item-text',text:f.text}));
-      if(f.ch && f.ch.trim()) li.appendChild(h('p',{class:'item-ch',text:f.ch}));
-      ul.appendChild(li);
-    });
-    fc.appendChild(ul); two.appendChild(fc);
-    root.appendChild(two);
-  }
-
-  function renderAction(t){
-    var card = h('section',{class:'card'},h('h2',{text:'الخطوة الحالية'}));
-    function turn(who,text){ card.appendChild(h('div',{class:'turn'},h('span',{class:'label',style:'margin:0',text:'الدور على'}),h('span',{class:'chip',text:who}),h('span',{text:text}))); }
-    var btns = h('div',{class:'btns'}), sims=null, hint='';
-    if(t.phase==='assigned'){
-      turn(t.assignee,'يستلم المهمة');
-      btns.appendChild(btn('b-main','استلمت المهمة',go('receive')));
-      sims = [btn('b-sim','مرّت 24 ساعة بدون استلام',go('noReceive'))];
-      hint = 'وصل العضو إشعار فوري داخل التطبيق وعلى الجوال والإيميل. إذا ما استلم خلال 24 ساعة يرسل النظام تذكيرًا له وتنبيهًا لرئيس القسم.';
-    } else if(t.phase==='inprogress'){
-      turn(t.assignee,'يشتغل على المهمة');
+/* ---------- task detail ---------- */
+function renderCreate(box){
+  var card = h('section',{class:'card'},h('h2',{text:'مهمة جديدة'}));
+  var plist = people.filter(function(p){return p.dept_id;}).map(function(p){ return [p.id,p.full_name+' — '+deptName(p.dept_id)]; });
+  if(!plist.length){ card.appendChild(h('p',{class:'empty',text:'ما فيه أشخاص مسجلين في أقسام بعد. أضفهم من صفحة الفريق.'})); box.appendChild(card); return; }
+  var asg = opts(h('select',{id:'n-asg'}), plist, plist[0][0]);
+  var prio = opts(h('select',{id:'n-prio'}), Object.keys(PRIO).map(function(k){return [k,PRIO[k].label];}), 'mid');
+  var nextSel = opts(h('select',{id:'n-next'}), [['','بدون']].concat(depts.map(function(d){return [d.id,d.name];})), '');
+  var rev = opts(h('select',{id:'n-rev'}), [['','أنا']].concat(people.filter(function(p){return p.id!==me.id;}).map(function(p){return [p.id,p.full_name+' — '+deptName(p.dept_id)];})), '');
+  var TPL = {shoot:['تصوير الجلسة',''],memories:['فيديو ذكريات الجلسة','social'],reels:['ريلز الشهر','social'],text:['نص الفويس أوفر أو الكابشن','']};
+  var tpl = opts(h('select',{id:'n-tpl'}), [['','— بدون قالب —'],['shoot','تصوير جلسة'],['memories','فيديو ذكريات الجلسة (ينتقل للسوشل ميديا)'],['reels','ريلز الشهر (ينتقل للسوشل ميديا)'],['text','طلب نص: فويس أوفر أو كابشن']], '');
+  tpl.addEventListener('change',function(){ var x=TPL[tpl.value]; if(!x) return; document.getElementById('n-title').value=x[0]; document.getElementById('n-next').value=x[1]; });
+  card.appendChild(h('div',{class:'fields'},
+    field('n-tpl','قالب جاهز (اختياري)',tpl,true),
+    field('n-title','عنوان المهمة',h('input',{id:'n-title',type:'text'}),true),
+    field('n-desc','الوصف (اختياري)',h('textarea',{id:'n-desc'}),true),
+    field('n-asg','أسندها إلى',asg),
+    field('n-prio','الأولوية',prio),
+    field('n-due','موعد التسليم',h('input',{id:'n-due',type:'date',value:isoPlus(5)})),
+    field('n-next','القسم التالي بعد الاعتماد',nextSel),
+    field('n-rev','المراجع (يعتمد الشغل)',rev)));
+  card.appendChild(h('div',{class:'btns'},
+    btn('b-main','انشر المهمة وأسندها',function(){
+      var title = val('n-title'); if(!title){ document.getElementById('n-title').focus(); return; }
+      var a = person(val('n-asg')); if(!a || !a.dept_id){ toast('اختر شخصًا له قسم','bad'); return; }
+      var nx = val('n-next'); var route=[a.dept_id]; if(nx && nx!==a.dept_id) route.push(nx);
+      var t = {id:uid(),_p:false,title:title,desc:val('n-desc'),prio:val('n-prio'),due:val('n-due')||isoPlus(5),route:route,idx:0,phase:'assigned',blockReason:'',blockWho:'',feed:[],
+        assigneeId:a.id,assignee:a.full_name,createdBy:me.id,createdByName:me.full_name,link:'',reviewerId:null,reviewer:''};
+      var rp = val('n-rev') ? person(val('n-rev')) : null; if(rp){ t.reviewerId=rp.id; t.reviewer=rp.full_name; }
+      log(t,'نشر المهمة وأسندها إلى '+a.full_name+(rp?' (المراجع: '+rp.full_name+')':''));
+      tasks.unshift(t); sel=t.id; creating=false; deptFilter='mine'; prioFilter='all'; view='task'; render();
+      saveTask(t).then(function(){ toast('نُشرت المهمة. اضغط «ذكّره بالواتساب» لتنبّه '+a.full_name); });
+    }),
+    btn('b-ghost','إلغاء',function(){ creating=false; render(); })));
+  box.appendChild(card);
+}
+function renderAction(t){
+  var card = h('section',{class:'card'},h('h2',{text:'الخطوة الحالية'}));
+  function turn(who,text){ card.appendChild(h('div',{class:'turn'},h('span',{class:'label',style:'margin:0',text:'الدور على'}),h('span',{class:'chip',text:who}),h('span',{text:text}))); }
+  var btns = h('div',{class:'btns'}), hint='';
+  var ownerName = t.reviewer || t.createdByName || 'من أسندها';
+  if(t.phase==='assigned'){
+    turn(t.assignee||'بدون مسؤول','يستلم المهمة');
+    if(canWork(t)) btns.appendChild(btn('b-main','استلمت المهمة',go('receive')));
+    else hint = 'بانتظار استلام '+(t.assignee||'المسؤول')+'.';
+  } else if(t.phase==='inprogress'){
+    turn(t.assignee||'بدون مسؤول','يشتغل على المهمة');
+    if(canWork(t)){
       card.appendChild(h('div',{class:'fields'},
-        field('f-comment','تعليق أو تحديث للتقدم',h('input',{id:'f-comment',type:'text',placeholder:'مثال: خلصت نصف المطلوب'}),true),
-        field('f-reason','سبب العائق (إذا فيه)',h('input',{id:'f-reason',type:'text',placeholder:'مثال: أنتظر ملفات'})),
-        field('f-who','منشن الشخص اللي تنتظر منه',h('input',{id:'f-who',type:'text',placeholder:'@اسم الشخص'}))));
+        field('f-comment','تعليق أو تحديث للتقدم',h('input',{id:'f-comment',type:'text'}),true),
+        field('f-reason','سبب العائق (إذا فيه)',h('input',{id:'f-reason',type:'text'})),
+        field('f-who','الشخص اللي تنتظر منه',h('input',{id:'f-who',type:'text'})),
+        field('f-link','رابط المواد عند التسليم (Google Drive)',h('input',{id:'f-link',type:'url',dir:'ltr',placeholder:'https://'}),true)));
       btns.appendChild(btn('b-ghost','أضف تحديثًا',go('update')));
       btns.appendChild(btn('b-bad','فيه عائق يوقف الشغل',go('block')));
       btns.appendChild(btn('b-main','سلّمت الشغل',go('deliver')));
-      sims = [btn('b-sim','مرّ يومان بدون تحديث',go('stale'))];
-      hint = 'إذا خلص الشغل يرفع العضو الملفات ويضغط «تم التسليم». وإذا مرّ يومان بدون تحديث ينبّه النظام العضو ورئيس القسم.';
-    } else if(t.phase==='blocked'){
-      turn('رئيس القسم أو المعني','يحل العائق');
-      btns.appendChild(btn('b-main','انحل العائق',go('resolve')));
-      hint = 'أُشعر المسؤول عن العائق ورئيس القسم. بعد الحل ترجع المهمة قيد العمل عند العضو.';
-    } else if(t.phase==='review'){
-      turn('رئيس القسم','يراجع الشغل');
-      card.appendChild(h('div',{class:'fields'},field('f-notes','ملاحظات التعديل (إذا يحتاج تعديل)',h('textarea',{id:'f-notes',placeholder:'اكتب الملاحظات ورئيس القسم يمنشن العضو'}),true)));
+      hint = 'إذا خلص الشغل اضغط «سلّمت الشغل» ويصير بانتظار مراجعة '+ownerName+'.';
+    } else hint = 'المهمة قيد العمل عند '+(t.assignee||'المسؤول')+'.';
+  } else if(t.phase==='blocked'){
+    turn(isOwner(t)?'أنت':ownerName,'يحل العائق');
+    if(isOwner(t)) btns.appendChild(btn('b-main','انحل العائق',go('resolve')));
+    else hint = 'المهمة متوقفة بانتظار حل العائق.';
+  } else if(t.phase==='review'){
+    turn(isOwner(t)?'أنت':ownerName,'يراجع الشغل');
+    if(isOwner(t)){
+      card.appendChild(h('div',{class:'fields'},field('f-notes','ملاحظات التعديل (إذا يحتاج تعديل)',h('textarea',{id:'f-notes'}),true)));
       btns.appendChild(btn('b-main','اعتمد الشغل',go('approve')));
       btns.appendChild(btn('b-ghost','يحتاج تعديل',go('edit')));
-      var nxt = t.idx+1 < t.route.length ? 'تنتقل المهمة تلقائيًا إلى قسم '+dept(t.route[t.idx+1]).name+' بإشعار ومنشن.' : 'ما فيه مرحلة تالية، فيصل إشعار الإنهاء لكل المشاركين.';
-      hint = 'عند الاعتماد: '+nxt;
-    } else {
-      card.appendChild(h('div',{class:'turn'},h('span',{class:'chip',text:'النظام'}),h('span',{text:'أُرسل إشعار الإنهاء لكل المشاركين في المهمة.'})));
-      hint = 'المهمة مكتملة.';
+      hint = t.idx+1<t.route.length ? 'عند الاعتماد تنتقل المهمة إلى مسؤول قسم '+deptName(t.route[t.idx+1])+'.' : 'هذه آخر مرحلة. عند الاعتماد تنتهي المهمة.';
+    } else hint = 'بانتظار مراجعة '+ownerName+'.';
+  } else {
+    card.appendChild(h('p',{class:'ok-text',text:'المهمة مكتملة.'}));
+  }
+  card.appendChild(btns);
+  if(hint) card.appendChild(h('p',{class:'hint',text:hint}));
+  if(t.phase!=='done' && isOwner(t)) card.appendChild(reminderBox(t));
+  return card;
+}
+function renderTask(box,t){
+  var cur = {assigned:1,inprogress:2,blocked:2,review:3,done:4}[t.phase];
+  var head = h('section',{class:'card'});
+  head.appendChild(h('div',{class:'d-top'},h('h2',{class:'d-title',text:t.title}),
+    h('div',{class:'badges'},h('span',{class:'pill '+t.prio,text:PRIO[t.prio].label}),h('span',{class:'pill st '+t.phase,text:PILL[t.phase]}))));
+  var route = h('ol',{class:'route','aria-label':'مسار المهمة'});
+  t.route.forEach(function(id,i){
+    if(i) route.appendChild(h('li',{class:'ar','aria-hidden':'true',text:'←'}));
+    route.appendChild(h('li',{class: i===t.idx ? (t.phase==='done'?'past':'cur') : (i<t.idx?'past':''),text:deptName(id)}));
+  });
+  head.appendChild(route);
+  var meta = h('dl',{class:'meta'});
+  function row(k,v){ meta.appendChild(h('div',{},h('dt',{text:k}),h('dd',{text:v}))); }
+  row('القسم الحالي',deptName(curDept(t))); row('المسؤول',t.assignee||'بدون مسؤول'); row('أسندها',t.createdByName||'—'); row('موعد التسليم',fmtDate(t.due));
+  head.appendChild(meta);
+  if(t.desc) head.appendChild(h('p',{class:'hint',text:t.desc}));
+  if(t.reviewer) head.appendChild(h('p',{class:'hint',text:'المراجع: '+t.reviewer}));
+  if(t.link && /^https?:\/\//i.test(t.link)) head.appendChild(h('p',{class:'hint'},h('a',{href:t.link,target:'_blank',rel:'noopener',text:'رابط المواد المسلّمة'})));
+  if(t.phase==='blocked') head.appendChild(h('div',{class:'blocknote',text:'العائق: '+t.blockReason+(t.blockWho?' · بانتظار '+t.blockWho:'')}));
+  box.appendChild(head);
+  var steps = h('ol',{class:'steps','aria-label':'مراحل المهمة'});
+  PHASES.forEach(function(name,i){
+    var c = (t.phase==='done'||i<cur) ? 'done' : (i===cur ? (t.phase==='blocked'?'current blocked':'current') : '');
+    steps.appendChild(h('li',{class:c},h('span',{class:'dot',text:c==='done'?'✓':String(i+1)}),h('span',{text:name})));
+  });
+  box.appendChild(h('section',{class:'card'},steps));
+  var two = h('div',{class:'two'});
+  two.appendChild(renderAction(t));
+  var fc = h('section',{class:'card'},h('h2',{text:'سجل المهمة'}));
+  var ul = h('ul',{class:'feed'});
+  if(!t.feed.length) ul.appendChild(h('li',{},h('p',{class:'empty',text:'ما فيه نشاط بعد.'})));
+  t.feed.forEach(function(f){
+    ul.appendChild(h('li',{class:'item activity'},h('div',{class:'item-top'},h('span',{text:f.by}),h('span',{text:fmtStamp(f.at)})),h('p',{class:'item-text',text:f.text})));
+  });
+  fc.appendChild(ul); two.appendChild(fc);
+  box.appendChild(two);
+}
+
+/* ---------- attendee sessions board ---------- */
+function gs(id){ return sessions.filter(function(x){return x.id===id;})[0]; }
+function daysLeft(x){ var a=new Date(x.date+'T00:00:00'), b=new Date(); b.setHours(0,0,0,0); return Math.round((a-b)/864e5); }
+function crew(x){ return x.team.length + x.vol.length; }
+function vtxt(x){ return (x.time?x.time+' · ':'')+(x.venue||'المكان لم يُحدد'); }
+function relDays(x){ var d=daysLeft(x); return d===0?'اليوم':d===1?'بكرة':d>1?'بعد '+d+' أيام':'قبل '+(-d)+' أيام'; }
+function reasons(x){
+  var r=[]; if(x.phase>=5) return r;
+  if(x.phase<4 && (!x.needed||!x.chairs)) r.push('أكمل عدد المشاركين والكراسي');
+  if(x.phase<4 && crew(x)<x.needed) r.push('ينقص '+(x.needed-crew(x))+' مشارك');
+  if(x.chairs>0 && x.registered>x.chairs) r.push('المسجلون ('+x.registered+') أكثر من الكراسي ('+x.chairs+')');
+  if(x.phase<3 && daysLeft(x)<=3 && x.setup.some(function(v){return !v;})) r.push('التجهيز غير مكتمل');
+  var n = alerts.filter(function(a){return a.sid===x.id && !a.read;}).length; if(n) r.push(n+' تنبيه جديد');
+  return r;
+}
+function bump(fn2,x){ return function(){ fn2(); render(); if(x) saveSession(x); }; }
+function numField(id,labelText,x,key){
+  var inp = h('input',{id:id,type:'number',min:'0',value:String(x[key])});
+  inp.addEventListener('change',function(){ var v=parseInt(inp.value,10); x[key]=isNaN(v)||v<0?0:v; render(); saveSession(x); });
+  return field(id,labelText,inp);
+}
+function checklist(x,list,arr){
+  var b = h('div',{});
+  list.forEach(function(name,i){
+    var cb = h('input',{type:'checkbox',id:'c-'+x.id+'-'+arr+'-'+i}); cb.checked = !!x[arr][i];
+    cb.addEventListener('change',function(){ x[arr][i]=cb.checked; render(); saveSession(x); });
+    b.appendChild(h('label',{class:'chk',for:'c-'+x.id+'-'+arr+'-'+i},cb,h('span',{text:name})));
+  });
+  return b;
+}
+function renderBoard(box){
+  var open = sessions.filter(function(x){return x.phase<5;});
+  var need = open.filter(function(x){return reasons(x).length;});
+  var short = open.filter(function(x){return x.phase<4 && crew(x)<x.needed;}).length;
+  var unread = alerts.filter(function(a){return !a.read;}).length;
+  var stats = h('div',{class:'stats'});
+  function stat(n,l,w){ stats.appendChild(h('div',{class:'stat'+(w&&n?' warn':'')},h('b',{text:String(n)}),h('span',{text:l}))); }
+  stat(open.length,'جلسات مفتوحة'); stat(need.length,'تحتاج متابعة',true); stat(short,'جلسات ينقصها مشاركون',true); stat(unread,'تنبيهات جديدة',true);
+  box.appendChild(h('section',{class:'card'},h('h2',{text:'وش عندي؟'}),stats));
+
+  var ac = h('section',{class:'card'},h('h2',{text:'التنبيهات'}));
+  var ul = h('ul',{class:'al-list'});
+  if(!alerts.length) ul.appendChild(h('li',{},h('p',{class:'empty',text:'ما فيه تنبيهات.'})));
+  alerts.slice(0,8).forEach(function(a){
+    var sx = gs(a.sid);
+    var li = h('li',{class:'al k-'+a.kind+(a.read?'':' unread')},
+      h('div',{class:'al-body'},h('p',{class:'al-kind',text:KIND[a.kind]+(sx?' · '+sx.title:'')+' · '+fmtStamp(a.at)}),h('p',{class:'al-text',text:a.text})));
+    if(!a.read) li.appendChild(btn('b-ghost','تمت القراءة',function(){ markRead(a); render(); }));
+    ul.appendChild(li);
+  });
+  ac.appendChild(ul);
+  var det = h('details',{style:'margin-top:12px'},h('summary',{text:'سجّل تنبيهًا'}));
+  var kindSel = opts(h('select',{id:'al-kind'}), Object.keys(KIND).map(function(k){return [k,KIND[k]];}), 'sponsor');
+  det.appendChild(h('div',{class:'fields',style:'margin-top:10px'},field('al-kind','النوع',kindSel),field('al-text','التفاصيل',h('input',{id:'al-text',type:'text'}),true)));
+  det.appendChild(btn('b-main','سجّل التنبيه',function(){
+    var t = val('al-text'); if(!t){ document.getElementById('al-text').focus(); return; }
+    var x = gs(sessSel); if(!x){ toast('اختر جلسة أولًا','bad'); return; }
+    addAlert(x.id,val('al-kind'),t).then(render); render();
+  }));
+  ac.appendChild(det);
+  box.appendChild(ac);
+
+  var sc = h('section',{class:'card'},h('h2',{text:'الجلسات والفرص'}));
+  var grid = h('div',{class:'sess-grid'});
+  if(!sessions.length) sc.appendChild(h('p',{class:'empty',text:'ما فيه جلسات. أضف أول جلسة من النموذج تحت.'}));
+  sessions.slice().sort(function(a,b){ return (a.phase>=5)-(b.phase>=5) || a.date.localeCompare(b.date); }).forEach(function(x){
+    var b = h('button',{type:'button',class:'sc'+(x.id===sessSel?' sel':''),on:function(){ sessSel=x.id; render(); }},
+      h('b',{text:x.title}),h('small',{text:fmtDate(x.date)+' · '+relDays(x)+' · '+vtxt(x)}),h('small',{text:PH[x.phase]+' · المشاركون '+crew(x)+' من '+x.needed}));
+    reasons(x).forEach(function(r){ b.appendChild(h('span',{class:'flag',text:r})); });
+    grid.appendChild(b);
+  });
+  sc.appendChild(grid); box.appendChild(sc);
+
+  var add = h('details',{class:'card'},h('summary',{text:'إضافة جلسة جديدة من التقويم'}));
+  add.appendChild(h('div',{class:'fields',style:'margin-top:12px'},
+    field('a-title','عنوان الجلسة',h('input',{id:'a-title',type:'text'}),true),
+    field('a-date','التاريخ',h('input',{id:'a-date',type:'date'})),
+    field('a-time','الوقت',h('input',{id:'a-time',type:'text',placeholder:'7:30 م'})),
+    field('a-venue','المكان',h('input',{id:'a-venue',type:'text'}))));
+  add.appendChild(btn('b-main','أضف الجلسة',function(){
+    var t=val('a-title'), d=val('a-date');
+    if(!t){ document.getElementById('a-title').focus(); return; }
+    if(!d){ document.getElementById('a-date').focus(); return; }
+    var n = {id:uid(),_p:false,title:t,time:val('a-time'),date:d,venue:val('a-venue'),registered:0,chairs:0,needed:0,team:[],vol:[],phase:0,checkedIn:0,setup:SETUP.map(function(){return false;}),wrap:WRAP.map(function(){return false;})};
+    sessions.push(n); sessSel=n.id; render(); saveSession(n);
+  }));
+  box.appendChild(add);
+
+  var x = gs(sessSel); if(x) box.appendChild(renderSession(x));
+  box.appendChild(h('p',{class:'note',text:'الشكاوى والتقييمات تصل للقسم الداخلي وهنا تظهر لك للعلم فقط.'}));
+}
+function renderSession(x){
+  var card = h('section',{class:'card'});
+  card.appendChild(h('div',{class:'d-top'},h('h2',{class:'d-title',text:x.title}),h('span',{class:'pill st',text:PH[x.phase]})));
+  card.appendChild(h('p',{class:'dept-note',text:fmtDate(x.date)+' ('+relDays(x)+') · '+vtxt(x)}));
+  var steps = h('ol',{class:'steps s6','aria-label':'مراحل الجلسة'});
+  PH.forEach(function(name,i){
+    var c = (i<x.phase||x.phase===5)?'done':(i===x.phase?'current':'');
+    steps.appendChild(h('li',{class:c},h('span',{class:'dot',text:c==='done'?'✓':String(i+1)}),h('span',{text:name})));
+  });
+  card.appendChild(steps);
+  var rs = reasons(x);
+  if(rs.length){ card.appendChild(h('p',{class:'sub-h',text:'تحتاج متابعة'})); rs.forEach(function(r){ card.appendChild(h('p',{class:'warn-text',text:'• '+r})); }); }
+  else if(x.phase<5) card.appendChild(h('p',{class:'ok-text',text:'ما فيه شي يحتاج متابعة حاليًا.'}));
+
+  card.appendChild(h('p',{class:'sub-h',text:'المسجلون والكراسي'}));
+  card.appendChild(h('div',{class:'row'},numField('n-reg-'+x.id,'عدد المسجلين',x,'registered'),numField('n-ch-'+x.id,'عدد الكراسي',x,'chairs')));
+  var over = x.chairs>0 && x.registered>x.chairs;
+  var pct = x.chairs ? Math.min(100,Math.round(x.registered/x.chairs*100)) : 0;
+  card.appendChild(h('div',{class:'meter'+(over?' over':''),role:'img','aria-label':'نسبة المسجلين إلى الكراسي'},h('i',{style:'width:'+pct+'%'})));
+  card.appendChild(h('p',{class:(over||!x.chairs)?'warn-text':'ok-text',text: !x.chairs ? 'لم يُحدد عدد الكراسي بعد.' : over ? 'ينقص '+(x.registered-x.chairs)+' كرسي لتغطية كل المسجلين.' : 'الكراسي تكفي المسجلين.'}));
+
+  card.appendChild(h('p',{class:'sub-h',text:'المشاركون ('+crew(x)+' من '+x.needed+')'}));
+  card.appendChild(h('div',{class:'row'},numField('n-need-'+x.id,'عدد المشاركين المطلوب',x,'needed')));
+  var chips = h('div',{class:'chips'});
+  if(!crew(x)) chips.appendChild(h('span',{class:'empty',text:'ما تم توزيع أحد بعد.'}));
+  x.team.forEach(function(n){ chips.appendChild(h('span',{class:'pchip',text:n})); });
+  x.vol.forEach(function(n){ chips.appendChild(h('span',{class:'pchip vol',text:n})); });
+  card.appendChild(chips);
+  if(x.phase<4){
+    var pool = people.filter(function(p){return p.dept_id==='attendee';}).map(function(p){return p.full_name;}).filter(function(n){return x.team.indexOf(n)<0;});
+    if(pool.length){
+      var pick = opts(h('select',{id:'p-'+x.id}),pool.map(function(n){return [n,n];}),'');
+      card.appendChild(h('div',{class:'row'},field('p-'+x.id,'أضف من الفريق',pick),btn('b-ghost','أضف',function(){
+        var v=pick.value; if(v && x.team.indexOf(v)<0){ x.team.push(v); render(); saveSession(x); addAlert(x.id,'assign','أُضيف '+v+' على الجلسة «'+x.title+'».').then(render); } })));
     }
-    card.appendChild(btns);
-    if(sims){ card.appendChild(h('p',{class:'sim-title',text:'مرور الوقت (محاكاة)'})); var sb=h('div',{class:'btns'}); sims.forEach(function(s){sb.appendChild(s);}); card.appendChild(sb); }
-    if(hint) card.appendChild(h('p',{class:'hint',text:hint}));
-    return card;
+    var vd = opts(h('select',{id:'v-'+x.id}),depts.filter(function(d){return d.id!=='attendee';}).map(function(d){return [d.id,d.name];}),'');
+    card.appendChild(h('div',{class:'row'},field('v-'+x.id,'استعن بمتطوع من قسم آخر',vd),btn('b-ghost','أضف متطوعًا',function(){
+      var nm='متطوع من '+deptName(vd.value); x.vol.push(nm); render(); saveSession(x); addAlert(x.id,'assign','أُضيف '+nm+' على الجلسة «'+x.title+'».').then(render); })));
   }
+  card.appendChild(h('p',{class:'sub-h',text:'الخطوة الحالية'}));
+  var btns = h('div',{class:'btns'});
+  if(x.phase===0){
+    card.appendChild(h('p',{class:'hint',text:'راجع مين صوّت أو أبدى رغبته في المشاركة ثم وزّع الأدوار حسب احتياج الفرصة.'}));
+    btns.appendChild(btn('b-main','ابدأ توزيع الأدوار',bump(function(){ x.phase=1; },x)));
+  } else if(x.phase===1){
+    card.appendChild(h('p',{class:'hint',text:'وزّع الأدوار وانشر جدول المسؤوليات في قروب تجربة الحضور. إذا العدد ناقص استعن بمتطوعين.'}));
+    btns.appendChild(btn('b-main','تم التوزيع، ابدأ التجهيز',bump(function(){ x.phase=2; },x)));
+  } else if(x.phase===2){
+    card.appendChild(h('p',{class:'hint',text:'تأكد من المكان قبل الجلسة بوقت كافي.'}));
+    card.appendChild(checklist(x,SETUP,'setup'));
+    var left = x.setup.filter(function(v){return !v;}).length;
+    if(left) card.appendChild(h('p',{class:'warn-text',text:'باقي '+left+' بند في التجهيز.'}));
+    btns.appendChild(btn('b-main','المكان جاهز، ابدأ الجلسة',bump(function(){ x.phase=3; },x)));
+  } else if(x.phase===3){
+    card.appendChild(h('p',{class:'hint',text:'الحاضر يمسح الباركود عند الدخول ويُختم الكرت.'}));
+    card.appendChild(h('p',{class:'ok-text',text:'دخل '+x.checkedIn+' من '+x.registered+' مسجل.'}));
+    if(x.checkedIn>x.chairs && x.chairs>0) card.appendChild(h('p',{class:'warn-text',text:'الحضور تجاوز الكراسي بـ '+(x.checkedIn-x.chairs)+'.'}));
+    btns.appendChild(btn('b-ghost','مسح باركود وختم الكرت (+1)',bump(function(){ x.checkedIn++; },x)));
+    btns.appendChild(btn('b-ghost','+5',bump(function(){ x.checkedIn+=5; },x)));
+    btns.appendChild(btn('b-main','انتهت الجلسة',bump(function(){ x.phase=4; },x)));
+  } else if(x.phase===4){
+    card.appendChild(h('p',{class:'hint',text:'بعد الجلسة: الصورة الجماعية وترتيب الأغراض، وبعدها ينتهي دورك التشغيلي.'}));
+    card.appendChild(checklist(x,WRAP,'wrap'));
+    btns.appendChild(btn('b-main','أنهِ دوري التشغيلي',bump(function(){ x.phase=5; },x)));
+  } else card.appendChild(h('p',{class:'hint',text:'الجلسة منتهية. حضر '+x.checkedIn+' من '+x.registered+' مسجل.'}));
+  card.appendChild(btns);
+  return card;
+}
 
-  function renderDetail(){
-    var root = document.getElementById('detail'); root.textContent = '';
-    if(creating){ renderCreate(root); return; }
-    if(deptFilter==='attendee'){
-      root.appendChild(h('div',{class:'tabs',role:'group','aria-label':'عرض قسم تجربة الحضور'},
-        h('button',{type:'button',class:'f'+(view==='sessions'?' on':''),on:function(){ view='sessions'; render(); },text:'لوحة الجلسات'}),
-        h('button',{type:'button',class:'f'+(view==='task'?' on':''),on:function(){ view='task'; render(); },text:'مهام القسم'})));
-      if(view==='sessions'){ renderBoard(root); return; }
+/* ---------- team (admin) ---------- */
+async function loadTeam(){
+  var r = await sb.from('profiles').select('*').order('full_name');
+  if(r.error){ toast('تعذر تحميل الفريق: '+r.error.message,'bad'); return; }
+  teamRows = r.data || [];
+}
+function credBox(){
+  if(!cred) return null;
+  var msg = 'أهلًا '+cred.name+'،\nتم إنشاء حسابك في دجه.\nالرابط: '+SITE+'\nالإيميل: '+cred.email+'\nكلمة السر المؤقتة: '+cred.password+'\nغيّرها عند أول دخول.';
+  var box = h('div',{class:'cred'},
+    h('p',{text:'حساب '+cred.name+' جاهز. أرسل له بيانات الدخول (تظهر مرة وحدة فقط):'}),
+    h('p',{},document.createTextNode('الإيميل: '),h('code',{text:cred.email})),
+    h('p',{},document.createTextNode('كلمة السر المؤقتة: '),h('code',{text:cred.password})));
+  var row = h('div',{class:'btns'});
+  var link = waLink(cred.phone,msg);
+  if(link) row.appendChild(h('a',{class:'btn-link',href:link,target:'_blank',rel:'noopener',text:'أرسلها بالواتساب'}));
+  else row.appendChild(h('a',{class:'btn-link off',text:'ما فيه رقم جوال'}));
+  row.appendChild(btn('b-ghost','انسخ الرسالة',function(){ if(navigator.clipboard) navigator.clipboard.writeText(msg).then(function(){ toast('تم النسخ'); },function(){ toast('تعذر النسخ','bad'); }); }));
+  row.appendChild(btn('b-ghost','إخفاء',function(){ cred=null; render(); }));
+  box.appendChild(row);
+  return box;
+}
+function renderTeamPage(box){
+  var add = h('section',{class:'card'},h('h2',{text:'إضافة شخص'}));
+  var dsel = opts(h('select',{id:'m-dept'}),[['','— بدون قسم (للمسؤول فقط) —']].concat(depts.map(function(d){return [d.id,d.name];})),'');
+  var rsel = opts(h('select',{id:'m-role'}),[['member','عضو'],['head','مسؤول قسم'],['admin','مسؤول النظام']],'member');
+  add.appendChild(h('div',{class:'fields'},
+    field('m-name','الاسم',h('input',{id:'m-name',type:'text'})),
+    field('m-email','الإيميل',h('input',{id:'m-email',type:'email',dir:'ltr'})),
+    field('m-phone','رقم الجوال',h('input',{id:'m-phone',type:'tel',dir:'ltr',placeholder:'05xxxxxxxx'})),
+    field('m-dept','القسم',dsel), field('m-role','الدور',rsel)));
+  add.appendChild(btn('b-main','أنشئ الحساب',async function(ev){
+    var b=ev.currentTarget; b.disabled=true;
+    try{
+      var r = await fn('manage-members',{action:'create',full_name:val('m-name'),email:val('m-email'),phone:val('m-phone'),dept_id:val('m-dept'),role:val('m-role')});
+      cred = {name:val('m-name'),email:val('m-email').toLowerCase(),phone:val('m-phone'),password:r.password};
+      await loadTeam(); await loadAll(); render();
+    }catch(e){ toast(errText(e),'bad'); b.disabled=false; }
+  }));
+  var cb = credBox(); if(cb) add.appendChild(cb);
+  box.appendChild(add);
+
+  var list = h('section',{class:'card'},h('h2',{text:'الفريق ('+teamRows.length+')'}));
+  var tb = h('table',{class:'tbl'});
+  tb.appendChild(h('thead',{},h('tr',{},h('th',{text:'الاسم'}),h('th',{text:'الإيميل'}),h('th',{text:'الجوال'}),h('th',{text:'القسم'}),h('th',{text:'الدور'}),h('th',{text:''}))));
+  var body = h('tbody');
+  teamRows.forEach(function(p){
+    var d = opts(h('select',{'aria-label':'القسم'}),[['','—']].concat(depts.map(function(x){return [x.id,x.name];})),p.dept_id||'');
+    d.addEventListener('change',async function(){ try{ await fn('manage-members',{action:'update',user_id:p.id,dept_id:d.value}); toast('تم تحديث القسم'); await loadTeam(); await loadAll(); render(); }catch(e){ toast(errText(e),'bad'); } });
+    var r = opts(h('select',{'aria-label':'الدور'}),[['member','عضو'],['head','مسؤول قسم'],['admin','مسؤول النظام']],p.role);
+    r.addEventListener('change',async function(){ try{ await fn('manage-members',{action:'update',user_id:p.id,role:r.value}); toast('تم تحديث الدور'); await loadTeam(); await loadAll(); render(); }catch(e){ toast(errText(e),'bad'); render(); } });
+    var acts = h('div',{class:'btns'});
+    acts.appendChild(btn('b-ghost','كلمة سر جديدة',async function(){
+      try{ var x = await fn('manage-members',{action:'reset',user_id:p.id}); cred={name:p.full_name,email:p.email,phone:p.phone,password:x.password}; render(); window.scrollTo(0,0); }catch(e){ toast(errText(e),'bad'); } }));
+    if(p.id!==me.id) acts.appendChild(btn('b-ghost',p.active?'إيقاف':'تفعيل',async function(){
+      try{ await fn('manage-members',{action:p.active?'deactivate':'activate',user_id:p.id}); await loadTeam(); await loadAll(); render(); }catch(e){ toast(errText(e),'bad'); } }));
+    body.appendChild(h('tr',{class:p.active?'':'off'},h('td',{text:p.full_name+(p.active?'':' (موقوف)')}),h('td',{dir:'ltr',text:p.email}),h('td',{dir:'ltr',text:p.phone||'—'}),h('td',{},d),h('td',{},r),h('td',{},acts)));
+  });
+  tb.appendChild(body);
+  list.appendChild(h('div',{class:'tbl-wrap'},tb));
+  box.appendChild(list);
+}
+
+/* ---------- shell ---------- */
+function topBar(){
+  var left = h('h1',{class:'brand',text:'دجه'},h('small',{text:ROLE[me.role]+(me.dept_id?' · '+deptName(me.dept_id):'')}));
+  var acts = h('div',{class:'top-actions'});
+  acts.appendChild(h('span',{class:'who'},h('span',{text:me.full_name})));
+  if(canCreate() && page==='work') acts.appendChild(btn('b-main','+ مهمة جديدة',function(){ creating=true; render(); }));
+  if(isAdmin()) acts.appendChild(btn('b-ghost',page==='team'?'رجوع للمهام':'الفريق',async function(){ page = page==='team'?'work':'team'; if(page==='team') await loadTeam(); render(); }));
+  acts.appendChild(btn('b-ghost','تحديث',async function(){ await loadAll(); if(page==='team') await loadTeam(); render(); toast('تم التحديث'); }));
+  acts.appendChild(btn('b-ghost','كلمة السر',function(){ renderChangePassword(false); }));
+  acts.appendChild(btn('b-ghost','خروج',logout));
+  return h('div',{class:'top'},left,acts);
+}
+function render(){
+  if(!me) return;
+  var wrap = h('div',{class:'wrap',dir:'rtl',lang:'ar'});
+  wrap.appendChild(topBar());
+  if(page==='team'){
+    var tb = h('div',{class:'detail'}); renderTeamPage(tb); wrap.appendChild(tb);
+  } else {
+    var nav = h('nav',{class:'card depts','aria-label':'الأقسام'}); renderDepts(nav);
+    var sec = h('section',{class:'card'}); renderList(sec);
+    var det = h('main',{class:'detail'});
+    if(creating) renderCreate(det);
+    else {
+      if(deptFilter==='attendee' && seesAttendee()){
+        det.appendChild(h('div',{class:'tabs',role:'group','aria-label':'عرض قسم تجربة الحضور'},
+          h('button',{type:'button',class:'f'+(view==='sessions'?' on':''),on:function(){ view='sessions'; render(); },text:'لوحة الجلسات'}),
+          h('button',{type:'button',class:'f'+(view==='task'?' on':''),on:function(){ view='task'; render(); },text:'مهام القسم'})));
+      }
+      if(deptFilter==='attendee' && seesAttendee() && view==='sessions') renderBoard(det);
+      else {
+        var t = tasks.filter(function(x){return x.id===sel;})[0];
+        if(t) renderTask(det,t);
+        else det.appendChild(h('section',{class:'card'},h('p',{class:'empty',text:'اختر مهمة من القائمة لتشوف تفاصيلها ومسارها.'})));
+      }
     }
-    var t = sel ? get(sel) : null;
-    if(!t){ root.appendChild(h('section',{class:'card'},h('p',{class:'empty',text:'اختر مهمة من القائمة لتشوف تفاصيلها ومسارها.'}))); return; }
-    renderTask(root,t);
+    wrap.appendChild(h('div',{class:'shell'},nav,sec,det));
   }
+  root.replaceChildren(wrap);
+}
+async function startApp(){
+  root.replaceChildren(h('div',{class:'wrap',dir:'rtl'},h('p',{class:'sub',text:'جارٍ التحميل…'})));
+  await loadAll();
+  page='work'; creating=false; deptFilter = isAdmin() ? 'all' : 'mine'; view='task';
+  ensureSel(); render();
+}
 
-
-  /* ---------- attendee experience: session board ---------- */
-  var view = 'task';
-  var PH = ['نزلت بالتقويم','توزيع الأدوار','تجهيز المكان','يوم الجلسة','بعد الجلسة','منتهية'];
-  var SETUP = ['ترتيب الكراسي','المايك','التكييف','الشكل العام للمكان','توزيع أماكن المشاركين حسب القسم','مراجعة الأدوار مع المشاركين'];
-  var WRAP = ['الصورة الجماعية','تجميع الأغراض وترتيب المكان'];
-  var POOL = ['ريم','تركي','هند','بدر','جود','منى','سعد','لمى'];
-  var KIND = {sponsor:'سبونسر أو علاقات عامة',complaint:'شكوى أو ملاحظة (المتابعة عند القسم الداخلي)',assign:'توزيع أو مشاركة جديدة',change:'تغيير (أُعلن في القروب العام)'};
-  var sid = 1, aid = 1, sessSel = 2;
-  var sessions = [], alerts = [];
-  function mkS(o){ o.id=sid++; o.vol=o.vol||[]; o.setup=o.setup||SETUP.map(function(){return false;}); o.wrap=o.wrap||WRAP.map(function(){return false;}); o.checkedIn=o.checkedIn||0; sessions.push(o); return o; }
-  function addAlert(sId,kind,text){ alerts.unshift({id:aid++,sid:sId,kind:kind,text:text,read:false}); }
-  mkS({title:'منطق العقل وجموح الخيال',time:'7:30 م',date:'2026-11-07',venue:'',registered:0,chairs:0,needed:0,team:[],phase:4});
-  mkS({title:'سيكولوجيا التميز',time:'7:30 م',date:'2026-11-21',venue:'',registered:0,chairs:0,needed:0,team:[],phase:0});
-  mkS({title:'جلسة دجه (العنوان لم يُعلن بعد)',time:'7:00 م',date:'2026-12-05',venue:'',registered:0,chairs:0,needed:0,team:[],phase:0});
-  mkS({title:'جلسة دجه (العنوان لم يُعلن بعد)',time:'7:00 م',date:'2026-12-19',venue:'',registered:0,chairs:0,needed:0,team:[],phase:0});
-  sessSel = 2;
-
-  function gs(id){ return sessions.filter(function(x){return x.id===id;})[0]; }
-  function daysLeft(x){ var a=new Date(x.date+'T00:00:00'), b=new Date(); b.setHours(0,0,0,0); return Math.round((a-b)/864e5); }
-  function crew(x){ return x.team.length + x.vol.length; }
-  function reasons(x){
-    var r = [];
-    if(x.phase>=5) return r;
-    if(x.phase<4 && (!x.needed || !x.chairs)) r.push('أكمل عدد المشاركين والكراسي');
-    if(x.phase<4 && crew(x)<x.needed) r.push('ينقص '+(x.needed-crew(x))+' مشارك');
-    if(x.chairs>0 && x.registered>x.chairs) r.push('المسجلون ('+x.registered+') أكثر من الكراسي ('+x.chairs+')');
-    if(x.phase<3 && daysLeft(x)<=3 && x.setup.some(function(v){return !v;})) r.push('التجهيز غير مكتمل');
-    var n = alerts.filter(function(a){return a.sid===x.id && !a.read;}).length;
-    if(n) r.push(n+' تنبيه جديد');
-    return r;
-  }
-  function vtxt(x){ return (x.time?x.time+' · ':'')+(x.venue||'المكان لم يُحدد'); }
-  function relDays(x){ var d=daysLeft(x); return d===0?'اليوم':d===1?'بكرة':d>1?'بعد '+d+' أيام':'قبل '+(-d)+' أيام'; }
-  function bump(fn){ return function(){ fn(); render(); }; }
-
-  function renderBoard(root){
-    var open = sessions.filter(function(x){return x.phase<5;});
-    var need = open.filter(function(x){return reasons(x).length;});
-    var short = open.filter(function(x){return x.phase<4 && crew(x)<x.needed;}).length;
-    var unread = alerts.filter(function(a){return !a.read;}).length;
-    var stats = h('div',{class:'stats'});
-    function stat(n,l,w){ stats.appendChild(h('div',{class:'stat'+(w&&n?' warn':'')},h('b',{text:String(n)}),h('span',{text:l}))); }
-    stat(open.length,'جلسات مفتوحة');
-    stat(need.length,'تحتاج متابعة',true);
-    stat(short,'جلسات ينقصها مشاركون',true);
-    stat(unread,'تنبيهات جديدة',true);
-    root.appendChild(h('section',{class:'card'},h('h2',{text:'وش عندي؟'}),stats));
-
-    /* alerts */
-    var ac = h('section',{class:'card'},h('h2',{text:'التنبيهات'}));
-    var ul = h('ul',{class:'al-list'});
-    if(!alerts.length) ul.appendChild(h('li',{},h('p',{class:'empty',text:'ما فيه تنبيهات.'})));
-    alerts.slice(0,8).forEach(function(a){
-      var sx = gs(a.sid);
-      var body = h('div',{class:'al-body'},h('p',{class:'al-kind',text:KIND[a.kind]+(sx?' · '+sx.title:'')}),h('p',{class:'al-text',text:a.text}));
-      var li = h('li',{class:'al k-'+a.kind+(a.read?'':' unread')},body);
-      if(!a.read) li.appendChild(btn('b-ghost','تمت القراءة',bump(function(){ a.read=true; })));
-      ul.appendChild(li);
-    });
-    ac.appendChild(ul);
-    ac.appendChild(h('p',{class:'sim-title',text:'محاكاة وصول تنبيه'}));
-    var sims = h('div',{class:'btns'});
-    var tgt = function(){ return gs(sessSel) || sessions[0]; };
-    sims.appendChild(btn('b-sim','سبونسر جديد',bump(function(){ addAlert(tgt().id,'sponsor','سبونسر جديد يحتاج تنسيق مع العلاقات العامة في التوزيع.'); })));
-    sims.appendChild(btn('b-sim','وصلت شكوى',bump(function(){ addAlert(tgt().id,'complaint','وصلت ملاحظة من أحد الحضور. المتابعة النهائية عند القسم الداخلي.'); })));
-    sims.appendChild(btn('b-sim','تغيير وقت الجلسة',bump(function(){ addAlert(tgt().id,'change','تغيّر وقت الجلسة وأُرسل التغيير في القروب العام.'); })));
-    ac.appendChild(sims);
-    root.appendChild(ac);
-
-    /* sessions */
-    var sc = h('section',{class:'card'},h('h2',{text:'الجلسات والفرص'}));
-    var grid = h('div',{class:'sess-grid'});
-    sessions.slice().sort(function(a,b){ return (a.phase>=5)-(b.phase>=5) || a.date.localeCompare(b.date); }).forEach(function(x){
-      var b = h('button',{type:'button',class:'sc'+(x.id===sessSel?' sel':''),on:bump(function(){ sessSel=x.id; })},
-        h('b',{text:x.title}),
-        h('small',{text:fmtDate(x.date)+' · '+relDays(x)+' · '+vtxt(x)}),
-        h('small',{text:PH[x.phase]+' · المشاركون '+crew(x)+' من '+x.needed}));
-      reasons(x).forEach(function(r){ b.appendChild(h('span',{class:'flag',text:r})); });
-      grid.appendChild(b);
-    });
-    sc.appendChild(grid);
-    root.appendChild(sc);
-
-    var det = h('details',{class:'card'},h('summary',{text:'إضافة جلسة جديدة من التقويم'}));
-    det.appendChild(h('div',{class:'fields',style:'margin-top:12px'},
-      field('a-title','عنوان الجلسة',h('input',{id:'a-title',type:'text'}),true),
-      field('a-date','التاريخ',h('input',{id:'a-date',type:'date'})),
-      field('a-time','الوقت',h('input',{id:'a-time',type:'text',placeholder:'7:30 م'})),
-      field('a-venue','المكان',h('input',{id:'a-venue',type:'text'}))));
-    det.appendChild(btn('b-main','أضف الجلسة',function(){
-      var t=val('a-title'), d=val('a-date');
-      if(!t){ document.getElementById('a-title').focus(); return; }
-      if(!d){ document.getElementById('a-date').focus(); return; }
-      var n = mkS({title:t,time:val('a-time'),date:d,venue:val('a-venue'),registered:0,chairs:0,needed:0,team:[],phase:0});
-      sessSel = n.id; render();
-    }));
-    root.appendChild(det);
-    var x = gs(sessSel);
-    if(x) root.appendChild(renderSession(x));
-    root.appendChild(h('p',{class:'note',text:'مواعيد الجلسات من تقويم الشهر. أسماء الفريق في القوائم أمثلة، وأعداد المسجلين والكراسي تدخلها أنت. الشكاوى والتقييمات تصل للقسم الداخلي وهنا تظهر لك للعلم فقط.'}));
-  }
-
-  function numField(id,labelText,x,key){
-    var inp = h('input',{id:id,type:'number',min:'0',value:String(x[key])});
-    inp.addEventListener('change',function(){ var v=parseInt(inp.value,10); x[key]=isNaN(v)||v<0?0:v; render(); });
-    return field(id,labelText,inp);
-  }
-  function checklist(x,list,arr){
-    var box = h('div',{});
-    list.forEach(function(name,i){
-      var cb = h('input',{type:'checkbox',id:'c-'+x.id+'-'+arr+'-'+i});
-      cb.checked = !!x[arr][i];
-      cb.addEventListener('change',function(){ x[arr][i]=cb.checked; render(); });
-      box.appendChild(h('label',{class:'chk',for:'c-'+x.id+'-'+arr+'-'+i},cb,h('span',{text:name})));
-    });
-    return box;
-  }
-  function renderSession(x){
-    var card = h('section',{class:'card'});
-    card.appendChild(h('div',{class:'d-top'},h('h2',{class:'d-title',text:x.title}),h('span',{class:'pill st',text:PH[x.phase]})));
-    card.appendChild(h('p',{class:'dept-note',text:fmtDate(x.date)+' ('+relDays(x)+') · '+vtxt(x)}));
-
-    var steps = h('ol',{class:'steps s6','aria-label':'مراحل الجلسة'});
-    PH.forEach(function(name,i){
-      var c = i<x.phase || x.phase===5 ? 'done' : (i===x.phase?'current':'');
-      var li = h('li',{class:c},h('span',{class:'dot',text:c==='done'?'✓':String(i+1)}),h('span',{text:name}));
-      if(i===x.phase && x.phase<5) li.setAttribute('aria-current','step');
-      steps.appendChild(li);
-    });
-    card.appendChild(steps);
-
-    var rs = reasons(x);
-    if(rs.length){
-      card.appendChild(h('p',{class:'sub-h',text:'تحتاج متابعة'}));
-      rs.forEach(function(r){ card.appendChild(h('p',{class:'warn-text',text:'• '+r})); });
-    } else if(x.phase<5){
-      card.appendChild(h('p',{class:'ok-text',text:'ما فيه شي يحتاج متابعة حاليًا.'}));
-    }
-
-    /* capacity */
-    card.appendChild(h('p',{class:'sub-h',text:'المسجلون والكراسي'}));
-    card.appendChild(h('div',{class:'row'},numField('n-reg-'+x.id,'عدد المسجلين',x,'registered'),numField('n-ch-'+x.id,'عدد الكراسي',x,'chairs')));
-    var pct = x.chairs ? Math.min(100, Math.round(x.registered/x.chairs*100)) : 0;
-    var over = x.chairs>0 && x.registered > x.chairs;
-    var m = h('div',{class:'meter'+(over?' over':''),role:'img','aria-label':'نسبة المسجلين إلى الكراسي'},h('i',{style:'width:'+pct+'%'}));
-    card.appendChild(m);
-    card.appendChild(h('p',{class:(over||!x.chairs)?'warn-text':'ok-text',text: !x.chairs ? 'لم يُحدد عدد الكراسي بعد.' : over ? 'ينقص '+(x.registered-x.chairs)+' كرسي لتغطية كل المسجلين.' : 'الكراسي تكفي المسجلين.'}));
-
-    /* crew */
-    card.appendChild(h('p',{class:'sub-h',text:'المشاركون ('+crew(x)+' من '+x.needed+')'}));
-    card.appendChild(h('div',{class:'row'},numField('n-need-'+x.id,'عدد المشاركين المطلوب',x,'needed')));
-    var chips = h('div',{class:'chips'});
-    if(!crew(x)) chips.appendChild(h('span',{class:'empty',text:'ما تم توزيع أحد بعد.'}));
-    x.team.forEach(function(n){ chips.appendChild(h('span',{class:'pchip',text:n})); });
-    x.vol.forEach(function(n){ chips.appendChild(h('span',{class:'pchip vol',text:n})); });
-    card.appendChild(chips);
-    if(x.phase<4){
-      var free = POOL.filter(function(n){ return x.team.indexOf(n)<0; });
-      var pick = opts(h('select',{id:'p-'+x.id}), free.map(function(n){return [n,n];}), '');
-      var vd = opts(h('select',{id:'v-'+x.id}), DEPTS.filter(function(d){return d.id!=='attendee';}).map(function(d){return [d.id,d.name];}), '');
-      card.appendChild(h('div',{class:'row'},field('p-'+x.id,'أضف من الفريق',pick),
-        btn('b-ghost','أضف',bump(function(){ var v=pick.value; if(v && x.team.indexOf(v)<0){ x.team.push(v); addAlert(x.id,'assign','أُضيف '+v+' على الجلسة «'+x.title+'».'); } }))));
-      card.appendChild(h('div',{class:'row'},field('v-'+x.id,'استعن بمتطوع من قسم آخر',vd),
-        btn('b-ghost','أضف متطوعًا',bump(function(){
-          var d = dept(vd.value); var nm = 'متطوع من '+d.name; x.vol.push(nm);
-          addAlert(x.id,'assign','أُضيف '+nm+' على الجلسة «'+x.title+'».'); }))));
-    }
-
-    /* phase action */
-    card.appendChild(h('p',{class:'sub-h',text:'الخطوة الحالية'}));
-    var btns = h('div',{class:'btns'});
-    if(x.phase===0){
-      card.appendChild(h('p',{class:'hint',text:'راجع مين صوّت أو أبدى رغبته في المشاركة ثم وزّع الأدوار حسب احتياج الفرصة.'}));
-      btns.appendChild(btn('b-main','ابدأ توزيع الأدوار',bump(function(){ x.phase=1; })));
-    } else if(x.phase===1){
-      card.appendChild(h('p',{class:'hint',text:'وزّع الأدوار وانشر جدول المسؤوليات في قروب تجربة الحضور. إذا العدد ناقص استعن بمتطوعين.'}));
-      btns.appendChild(btn('b-main','تم التوزيع، ابدأ التجهيز',bump(function(){ x.phase=2; })));
-    } else if(x.phase===2){
-      card.appendChild(h('p',{class:'hint',text:'تأكد من المكان قبل الجلسة بوقت كافي.'}));
-      card.appendChild(checklist(x,SETUP,'setup'));
-      var left = x.setup.filter(function(v){return !v;}).length;
-      if(left) card.appendChild(h('p',{class:'warn-text',text:'باقي '+left+' بند في التجهيز.'}));
-      btns.appendChild(btn('b-main','المكان جاهز، ابدأ الجلسة',bump(function(){ x.phase=3; })));
-    } else if(x.phase===3){
-      card.appendChild(h('p',{class:'hint',text:'الحاضر يمسح الباركود عند الدخول ويُختم الكرت.'}));
-      card.appendChild(h('p',{class:'ok-text',text:'دخل '+x.checkedIn+' من '+x.registered+' مسجل.'}));
-      if(x.checkedIn>x.chairs) card.appendChild(h('p',{class:'warn-text',text:'الحضور تجاوز الكراسي بـ '+(x.checkedIn-x.chairs)+'.'}));
-      btns.appendChild(btn('b-ghost','مسح باركود وختم الكرت (+1)',bump(function(){ x.checkedIn++; })));
-      btns.appendChild(btn('b-ghost','+5',bump(function(){ x.checkedIn+=5; })));
-      btns.appendChild(btn('b-main','انتهت الجلسة',bump(function(){ x.phase=4; })));
-    } else if(x.phase===4){
-      card.appendChild(h('p',{class:'hint',text:'بعد الجلسة: الصورة الجماعية وترتيب الأغراض، وبعدها ينتهي دورك التشغيلي.'}));
-      card.appendChild(checklist(x,WRAP,'wrap'));
-      btns.appendChild(btn('b-main','أنهِ دوري التشغيلي',bump(function(){ x.phase=5; })));
-    } else {
-      card.appendChild(h('p',{class:'hint',text:'الجلسة منتهية. حضر '+x.checkedIn+' من '+x.registered+' مسجل.'}));
-    }
-    card.appendChild(btns);
-    return card;
-  }
-
-  document.getElementById('new-btn').addEventListener('click',function(){ creating=true; render(); document.getElementById('detail').scrollIntoView({block:'start'}); });
-  function render(){ renderDepts(); renderList(); renderDetail(); }
-  render();
+/* ---------- boot ---------- */
+sb.auth.onAuthStateChange(function(ev){ if(ev==='SIGNED_OUT' && me){ renderLogin(); } });
+document.addEventListener('visibilitychange',function(){ if(!document.hidden && me && !creating && page==='work'){ var a=document.activeElement; if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; loadAll().then(render); } });
+(async function(){
+  try{
+    var s = await sb.auth.getSession();
+    if(s.data && s.data.session) await afterLogin(); else renderLogin();
+  }catch(e){ renderLogin('تعذر الاتصال بالخادم. أعد تحميل الصفحة.'); }
 })();
-</script>
+})();
 
+</script>
+</body>
 </html>
